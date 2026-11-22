@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Global Korean-aware font stack (Pretendard Variable)
+   Applied to all text-bearing elements so Korean characters
+   never fall back to OS default fonts.
+   ============================================================ */
+:root {
+  --font-sans: "Pretendard Variable", Pretendard, Nunito, -apple-system,
+    BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI",
+    "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-[#F7F5F0] text-pastel-charcoal min-h-screen flex justify-center;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom scrollbar for mobile feel */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #E0DCD3;
+  border-radius: 9999px;
+}
+
+/* Safe area support for mobile devices */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
