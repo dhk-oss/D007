@@ -1,3 +1,5 @@
 {
-  "projects": {}
+  "projects": {
+    "default": "kids-ai-stylist-d007"
+  }
 }
