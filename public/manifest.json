@@ -1,0 +1,17 @@
+{
+  "name": "Kids AI Stylist",
+  "short_name": "KidsStylist",
+  "description": "Smart AI-powered daily styling and digital wardrobe for kids aged 3-11",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFBF7",
+  "theme_color": "#E89E84",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

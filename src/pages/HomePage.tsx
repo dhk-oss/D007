@@ -11,6 +11,7 @@ import {
   ArrowRightLeft,
   AlertTriangle,
   Check,
+  ShoppingBag,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -18,6 +19,7 @@ import { OccasionKey, WardrobeItem, ClothingCategory } from '../types';
 import { ChildSelector } from '../components/ChildSelector';
 import { LocationSelectorModal } from '../components/LocationSelectorModal';
 import { WardrobePickerModal } from '../components/WardrobePickerModal';
+import { AdBanner } from '../components/AdBanner';
 import { CORE_OCCASIONS, recommendOutfitFromWardrobe, OutfitRecommendation } from '../services/stylingEngine';
 import { generateVirtualTryOn } from '../services/virtualTryOnService';
 import { getLocalizedItemName } from '../utils/wardrobeLocalization';
@@ -421,12 +423,27 @@ export const HomePage: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleOpenSwap(cat)}
-                  className="px-2 py-1 rounded-lg bg-white hover:bg-stone-100 border border-stone-200 text-pastel-coral text-[10px] font-bold shrink-0 transition"
-                >
-                  {t('swapBtn')}
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {item && (
+                    <a
+                      href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(
+                        `아동 ${getLocalizedItemName(item, locale)}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={locale === 'ko' ? '유사 아이템 쇼핑' : 'Shop Similar'}
+                      className="p-1 rounded-lg bg-white hover:bg-pastel-peach/30 border border-stone-200 text-stone-600 hover:text-pastel-coral transition"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => handleOpenSwap(cat)}
+                    className="px-2 py-1 rounded-lg bg-white hover:bg-stone-100 border border-stone-200 text-pastel-coral text-[10px] font-bold transition"
+                  >
+                    {t('swapBtn')}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -469,8 +486,33 @@ export const HomePage: React.FC = () => {
                 💡 {recommendation.proportionAdvice}
               </p>
             )}
+
+            {/* Affiliate CTA: Shop Similar Look */}
+            <a
+              href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(
+                `키즈 아동복 ${activeItems.map((i) => getLocalizedItemName(i, locale)).slice(0, 2).join(' ')} 코디`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-white/90 border border-pastel-coral/30 text-pastel-coral text-xs font-bold hover:bg-white transition active:scale-[0.99] shadow-xs"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>
+                {locale === 'ko'
+                  ? '유사 아이템 쇼핑하기'
+                  : locale === 'ja'
+                  ? '類似アイテムをショッピング'
+                  : locale === 'zh'
+                  ? '选购同款穿搭'
+                  : 'Shop Similar Look'}
+              </span>
+              <ExternalLink className="w-3 h-3 opacity-70" />
+            </a>
           </div>
         )}
+
+        {/* Commercial Monetization Ad Banner */}
+        <AdBanner className="mt-1" />
       </div>
 
       {/* Location Selector Modal */}
