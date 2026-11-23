@@ -166,6 +166,8 @@ export function getLocalizedLocation(location?: Partial<LocationInfo> | null, lo
 export function getLocalizedWeatherBadge(condition: string = '', locale: string = 'ko'): string {
   const condLower = (condition || '').toLowerCase();
 
+  const isDrizzle = condLower.includes('drizzle');
+  const isFog = condLower.includes('fog');
   const isRain = condLower.includes('rain') || condLower.includes('shower');
   const isSnow = condLower.includes('snow');
   const isCloudy = condLower.includes('cloud') || condLower.includes('overcast');
@@ -175,6 +177,8 @@ export function getLocalizedWeatherBadge(condition: string = '', locale: string 
   const isClear = condLower.includes('clear') || condLower.includes('sun') || condLower.includes('pleasant');
 
   if (locale === 'ko') {
+    if (isDrizzle) return '이슬비/흐림';
+    if (isFog) return '안개/흐림';
     if (isRain) return '비/소나기';
     if (isSnow) return '눈/한파';
     if (isColdClear) return '맑고 쌀쌀함';
@@ -186,6 +190,8 @@ export function getLocalizedWeatherBadge(condition: string = '', locale: string 
   }
 
   if (locale === 'ja') {
+    if (isDrizzle) return '小雨・曇り';
+    if (isFog) return '霧・かすみ';
     if (isRain) return '雨模様';
     if (isSnow) return '雪・寒波';
     if (isColdClear) return '寒冷・晴れ';
@@ -197,6 +203,8 @@ export function getLocalizedWeatherBadge(condition: string = '', locale: string 
   }
 
   if (locale === 'zh') {
+    if (isDrizzle) return '小雨微湿';
+    if (isFog) return '雾气阴天';
     if (isRain) return '小雨/阵雨';
     if (isSnow) return '降雪冷锋';
     if (isColdClear) return '晴朗干冷';
@@ -208,6 +216,8 @@ export function getLocalizedWeatherBadge(condition: string = '', locale: string 
   }
 
   // English fallback
+  if (isDrizzle) return 'Drizzle / Overcast';
+  if (isFog) return 'Foggy';
   if (isRain) return 'Rain / Showers';
   if (isSnow) return 'Snow & Cold';
   if (isColdClear) return 'Cold & Clear';

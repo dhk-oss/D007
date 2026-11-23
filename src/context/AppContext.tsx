@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ChildProfile, WardrobeItem, StylingLookbook, WeatherSnapshot, LocationInfo } from '../types';
 import { DataService } from '../services/dataService';
-import { fetchWeatherForLocation } from '../services/weatherService';
+import { fetchWeatherForLocation, findClosestPresetLocation } from '../services/weatherService';
 
 interface AppContextType {
   childrenList: ChildProfile[];
@@ -13,7 +13,9 @@ interface AppContextType {
   currentLocation: LocationInfo;
   setCurrentLocation: (loc: LocationInfo) => void;
   currentWeather: WeatherSnapshot;
-  refreshWeather: () => Promise<void>;
+  isWeatherLoading: boolean;
+  refreshWeather: (targetLocation?: LocationInfo) => Promise<void>;
+  detectCurrentLocation: () => Promise<void>;
   addChildProfile: (profile: Omit<ChildProfile, 'id'>) => boolean;
   updateChildProfile: (profile: ChildProfile) => void;
   deleteChildProfile: (id: string) => void;
@@ -33,15 +35,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>(() => DataService.getWardrobe());
   const [lookbooks, setLookbooks] = useState<StylingLookbook[]>(() => DataService.getLookbooks());
   const [currentLocation, setCurrentLocationState] = useState<LocationInfo>(() => DataService.getLocation());
+  const [isWeatherLoading, setIsWeatherLoading] = useState<boolean>(false);
   const [currentWeather, setCurrentWeather] = useState<WeatherSnapshot>({
-    temp: 18,
-    condition: 'Partly Sunny',
-    highTemp: 21,
-    lowTemp: 12,
-    description: 'Pleasant with light afternoon breeze',
-    humidity: 50,
-    source: 'AccuWeather (Simulated Seasonal)',
-    attributionLink: 'https://www.accuweather.com/',
+    temp: 12,
+    condition: 'Partly Cloudy',
+    highTemp: 15,
+    lowTemp: 5,
+    description: 'Refreshing real-time weather update',
+    humidity: 60,
+    source: 'Open-Meteo Live',
+    attributionLink: 'https://open-meteo.com/',
+    updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    isLive: true,
   });
   const [activeTab, setActiveTab] = useState<'home' | 'wardrobe' | 'profiles' | 'lookbook'>('home');
 
@@ -51,18 +56,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWardrobe(currentWardrobe);
   }, []);
 
-  const refreshWeather = async () => {
+  const refreshWeather = async (targetLocation?: LocationInfo) => {
+    const loc = targetLocation || currentLocation;
+    setIsWeatherLoading(true);
     try {
-      const w = await fetchWeatherForLocation(currentLocation);
+      const w = await fetchWeatherForLocation(loc);
       setCurrentWeather(w);
     } catch (e) {
       console.warn('Weather fetch error:', e);
+    } finally {
+      setIsWeatherLoading(false);
     }
   };
 
+  const detectCurrentLocation = async () => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      setIsWeatherLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const closest = findClosestPresetLocation(lat, lon);
+          const detectedLoc: LocationInfo = {
+            country: closest.country,
+            province: closest.province,
+            city: closest.city,
+            displayName: closest.label,
+            latitude: lat,
+            longitude: lon,
+          };
+          setCurrentLocationState(detectedLoc);
+          DataService.saveLocation(detectedLoc);
+          await refreshWeather(detectedLoc);
+        },
+        async (err) => {
+          console.info('Geolocation not available, using stored location:', err.message);
+          await refreshWeather();
+        },
+        { timeout: 7000 }
+      );
+    } else {
+      await refreshWeather();
+    }
+  };
+
+  // Initial mount: attempt geolocation or fetch live weather for saved location immediately
+  useEffect(() => {
+    detectCurrentLocation();
+  }, []);
+
+  // Whenever user manually changes location, re-fetch weather
   useEffect(() => {
     refreshWeather();
-  }, [currentLocation]);
+  }, [currentLocation.city, currentLocation.province, currentLocation.latitude]);
 
   const setCurrentLocation = (loc: LocationInfo) => {
     setCurrentLocationState(loc);
@@ -157,7 +203,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentLocation,
         setCurrentLocation,
         currentWeather,
+        isWeatherLoading,
         refreshWeather,
+        detectCurrentLocation,
         addChildProfile,
         updateChildProfile,
         deleteChildProfile,

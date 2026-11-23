@@ -19,6 +19,8 @@ export interface LocationInfo {
   province: string;
   city: string;
   displayName?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface ParentUser {
@@ -69,9 +71,10 @@ export interface WeatherSnapshot {
   lowTemp?: number;
   description?: string;
   humidity?: number;
-  source?: string; // 'AccuWeather' | 'AccuWeather (Simulated Seasonal)'
-  attributionLink?: string; // 'https://www.accuweather.com/'
+  source?: string; // 'Open-Meteo Live' | 'AccuWeather' | 'AccuWeather (Simulated Seasonal)'
+  attributionLink?: string; // 'https://open-meteo.com/' | 'https://www.accuweather.com/'
   updatedAt?: string;
+  isLive?: boolean;
 }
 
 export type OccasionKey = 

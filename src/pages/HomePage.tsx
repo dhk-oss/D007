@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Sun,
+  Cloud,
   CloudRain,
+  CloudSnow,
+  Wind,
   Bookmark,
   RefreshCw,
   Shirt,
@@ -80,6 +83,8 @@ export const HomePage: React.FC = () => {
     currentLocation,
     setCurrentLocation,
     currentWeather,
+    isWeatherLoading,
+    refreshWeather,
     saveLookbook,
   } = useApp();
   const { t, locale } = useTranslation();
@@ -105,7 +110,7 @@ export const HomePage: React.FC = () => {
     heightCm: 115,
     weightKg: 20.5,
     waistCm: 53,
-    fullBodyPhotoUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80',
+    fullBodyPhotoUrl: '',
     bodyProportionAnalysis: {
       torsoRatio: 0.41,
       legRatio: 0.59,
@@ -235,34 +240,69 @@ export const HomePage: React.FC = () => {
         <ChildSelector />
       </div>
 
-      {/* Location & AccuWeather Card */}
+      {/* Location & Real-Time Weather Card */}
       <div className="bg-gradient-to-br from-amber-50/90 to-orange-50/80 border border-amber-200/70 rounded-3xl p-4 shadow-soft space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
-            <MapPin className="w-3.5 h-3.5 text-pastel-coral" />
+          <div className="flex items-center gap-1.5 flex-wrap text-xs font-bold text-stone-700">
+            <MapPin className="w-3.5 h-3.5 text-pastel-coral shrink-0" />
             <span>{getLocalizedLocation(currentLocation, locale)}</span>
+            {currentWeather?.isLive && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                LIVE
+              </span>
+            )}
+            {currentWeather?.updatedAt && (
+              <span className="text-[10px] text-stone-400 font-medium">
+                ({currentWeather.updatedAt})
+              </span>
+            )}
           </div>
 
-          <button
-            onClick={() => setIsLocationModalOpen(true)}
-            className="text-[11px] font-bold text-pastel-coral bg-white px-2.5 py-1 rounded-full border border-pastel-coral/30 hover:bg-pastel-coral-light transition"
-          >
-            {t('changeLocation')}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => refreshWeather()}
+              disabled={isWeatherLoading}
+              title={t('updateForecast')}
+              className="p-1.5 rounded-full bg-white text-stone-600 hover:text-pastel-coral border border-stone-200/90 shadow-2xs transition active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isWeatherLoading ? 'animate-spin text-pastel-coral' : ''}`} />
+            </button>
+            <button
+              onClick={() => setIsLocationModalOpen(true)}
+              className="text-[11px] font-bold text-pastel-coral bg-white px-2.5 py-1 rounded-full border border-pastel-coral/30 hover:bg-pastel-coral-light transition shadow-2xs"
+            >
+              {t('changeLocation')}
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-xs flex items-center justify-center text-amber-500">
-              {currentWeather?.condition?.toLowerCase().includes('rain') ? (
-                <CloudRain className="w-7 h-7 text-sky-500" />
-              ) : (
-                <Sun className="w-7 h-7 text-amber-500" />
-              )}
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-xs flex items-center justify-center">
+              {(() => {
+                const c = (currentWeather?.condition || '').toLowerCase();
+                if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) {
+                  return <CloudRain className="w-7 h-7 text-sky-500" />;
+                }
+                if (c.includes('snow')) {
+                  return <CloudSnow className="w-7 h-7 text-indigo-400" />;
+                }
+                if (c.includes('cloud') || c.includes('overcast')) {
+                  return <Cloud className="w-7 h-7 text-stone-400" />;
+                }
+                if (c.includes('wind') || c.includes('fog')) {
+                  return <Wind className="w-7 h-7 text-teal-600" />;
+                }
+                return <Sun className="w-7 h-7 text-amber-500" />;
+              })()}
             </div>
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-stone-800">{currentWeather?.temp ?? 18}°C</span>
+                <span className="text-3xl font-black text-stone-800">
+                  {currentWeather?.temp ?? 18}°C
+                </span>
                 <span className="text-xs font-bold text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-full">
                   {getLocalizedWeatherBadge(currentWeather?.condition, locale)}
                 </span>
@@ -274,15 +314,17 @@ export const HomePage: React.FC = () => {
           </div>
 
           <a
-            href={currentWeather?.attributionLink || 'https://www.accuweather.com/'}
+            href={currentWeather?.attributionLink || 'https://open-meteo.com/'}
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-col items-end text-[10px] text-stone-400 hover:text-amber-700 transition"
           >
             <span className="font-bold flex items-center gap-0.5">
-              AccuWeather <ExternalLink className="w-2.5 h-2.5" />
+              {currentWeather?.source || 'Open-Meteo Live'} <ExternalLink className="w-2.5 h-2.5" />
             </span>
-            <span className="text-[9px] text-amber-600/80 font-medium">{t('regionalForecast')}</span>
+            <span className="text-[9px] text-amber-600/80 font-medium">
+              {currentWeather?.isLive ? 'Real-Time Live' : t('regionalForecast')}
+            </span>
           </a>
         </div>
 
