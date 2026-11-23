@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Check, Trash2, Shirt, Sparkles } from 'lucide-react';
 import { WardrobeItem, ClothingCategory } from '../types';
 import { useTranslation } from '../context/LanguageContext';
@@ -29,6 +29,12 @@ export const WardrobePickerModal: React.FC<WardrobePickerModalProps> = ({
 }) => {
   const { t, locale } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<ClothingCategory | 'all'>(categoryFilter);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveCategory(categoryFilter);
+    }
+  }, [isOpen, categoryFilter]);
 
   if (!isOpen) return null;
 

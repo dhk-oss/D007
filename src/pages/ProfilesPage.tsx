@@ -43,9 +43,7 @@ export const ProfilesPage: React.FC = () => {
   const [heightCm, setHeightCm] = useState(115);
   const [weightKg, setWeightKg] = useState(20);
   const [waistCm, setWaistCm] = useState(52);
-  const [photoUrl, setPhotoUrl] = useState(
-    'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80'
-  );
+  const [photoUrl, setPhotoUrl] = useState('');
   const [previewAnalysis, setPreviewAnalysis] = useState<BodyProportionAnalysis | null>(null);
 
   const activeChild = (childrenList && childrenList.find((c) => c.id === activeChildId)) ||
@@ -86,7 +84,7 @@ export const ProfilesPage: React.FC = () => {
     setHeightCm(115);
     setWeightKg(20);
     setWaistCm(52);
-    setPhotoUrl('https://images.unsplash.com/photo-1543087903-1ac2ec7aa8c5?auto=format&fit=crop&w=400&q=80');
+    setPhotoUrl('');
     setPreviewAnalysis(null);
     setIsModalOpen(true);
   };
@@ -545,8 +543,14 @@ export const ProfilesPage: React.FC = () => {
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1">{t('standingPhoto')}</label>
                 <div className="flex gap-2.5 items-center">
-                  <div className="w-14 h-18 rounded-xl overflow-hidden border border-stone-200 bg-stone-100 shrink-0">
-                    <img src={photoUrl} alt="preview" className="w-full h-full object-cover" />
+                  <div className="w-14 h-18 rounded-xl overflow-hidden border border-stone-200 bg-stone-100 shrink-0 flex items-center justify-center">
+                    {isValidPhoto(photoUrl) ? (
+                      <img src={photoUrl} alt="preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-pastel-coral-light border border-pastel-coral/30 flex items-center justify-center text-xs font-black text-pastel-coral">
+                        {getLocalizedChildName(name || activeChild?.name || '아이', locale).slice(0, 1)}
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 space-y-1.5">
                     <button

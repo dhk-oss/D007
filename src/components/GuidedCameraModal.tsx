@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, RefreshCw, X, Check, Upload, FlipHorizontal, AlertCircle } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
+import { compressImageToDataUrl } from '../services/dataService';
 
 interface GuidedCameraModalProps {
   isOpen: boolean;
@@ -87,9 +88,11 @@ export const GuidedCameraModal: React.FC<GuidedCameraModalProps> = ({
   const handleTakeSnapshot = () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
+    const maxWidth = 800;
+    const scale = Math.min(1, maxWidth / (video.videoWidth || 640));
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = Math.round((video.videoWidth || 640) * scale);
+    canvas.height = Math.round((video.videoHeight || 480) * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -99,23 +102,22 @@ export const GuidedCameraModal: React.FC<GuidedCameraModalProps> = ({
     }
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
     setCapturedImage(dataUrl);
     stopStream();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setCapturedImage(reader.result);
-        stopStream();
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedDataUrl = await compressImageToDataUrl(file, 800, 800, 0.8);
+      setCapturedImage(compressedDataUrl);
+      stopStream();
+    } catch (err) {
+      console.warn('Failed to compress uploaded photo:', err);
+    }
   };
 
   const handleRetake = () => {

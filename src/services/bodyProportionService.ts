@@ -19,8 +19,12 @@ export interface VisionEstimatorProvider {
 /**
  * Analyzes offscreen image element to inspect aspect ratio, orientation, and resolution
  */
-function analyzeImageMetadata(imageUrl: string): Promise<{ width: number; height: number; aspectRatio: number }> {
+function analyzeImageMetadata(imageUrl?: string | null): Promise<{ width: number; height: number; aspectRatio: number }> {
   return new Promise((resolve) => {
+    if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim() === '' || imageUrl.includes('unsplash.com')) {
+      resolve({ width: 400, height: 600, aspectRatio: 1.5 });
+      return;
+    }
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {

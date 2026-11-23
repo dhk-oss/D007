@@ -23,6 +23,78 @@ const LEGACY_KEYS = [
   'kids_ai_location_v1',
 ];
 
+/**
+ * Offscreen HTML5 Canvas Image Compressor
+ * Resizes high-resolution camera captures and uploaded files to max dimensions and compresses to JPEG
+ */
+export async function compressImageToDataUrl(
+  fileOrDataUrl: File | string,
+  maxWidth: number = 800,
+  maxHeight: number = 800,
+  quality: number = 0.8
+): Promise<string> {
+  // If it is an SVG flat-lay, preserve vector clarity and do not rasterize
+  if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:image/svg+xml')) {
+    return fileOrDataUrl;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    const processImage = () => {
+      let width = img.naturalWidth || img.width || maxWidth;
+      let height = img.naturalHeight || img.height || maxHeight;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width / maxWidth > height / maxHeight) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, width);
+      canvas.height = Math.max(1, height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '');
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+
+    img.onload = processImage;
+    img.onerror = () => {
+      if (typeof fileOrDataUrl === 'string') {
+        resolve(fileOrDataUrl);
+      } else {
+        reject(new Error('Failed to load image for compression'));
+      }
+    };
+
+    if (typeof fileOrDataUrl === 'string') {
+      img.src = fileOrDataUrl;
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          img.src = reader.result;
+        } else {
+          reject(new Error('Failed to read file as DataURL'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(fileOrDataUrl);
+    }
+  });
+}
+
 function getItem<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -259,43 +331,34 @@ export const DataService = {
   },
 
   /**
-   * Image File & Camera Snapshot Upload Helper
+   * Image File & Camera Snapshot Upload Helper with automatic client-side compression
    */
   async uploadImage(dataUrlOrFile: string | File, folder: 'children' | 'wardrobe' = 'wardrobe'): Promise<string> {
-    if (typeof dataUrlOrFile === 'string') {
+    try {
+      const compressedDataUrl = await compressImageToDataUrl(dataUrlOrFile, 800, 800, 0.8);
+
       if (!isMockMode && storage) {
         try {
           const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
           const storageRef = ref(storage, fileName);
-          await uploadString(storageRef, dataUrlOrFile, 'data_url');
+          await uploadString(storageRef, compressedDataUrl, 'data_url');
           return await getDownloadURL(storageRef);
         } catch (err) {
-          console.warn('Firebase upload failed, using dataUrl directly:', err);
-          return dataUrlOrFile;
+          console.warn('Firebase upload failed, using compressed dataUrl directly:', err);
+          return compressedDataUrl;
         }
       }
-      return dataUrlOrFile;
-    }
 
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        if (!isMockMode && storage) {
-          try {
-            const fileName = `${folder}/${Date.now()}_${dataUrlOrFile.name}`;
-            const storageRef = ref(storage, fileName);
-            await uploadString(storageRef, dataUrl, 'data_url');
-            resolve(await getDownloadURL(storageRef));
-          } catch (e) {
-            resolve(dataUrl);
-          }
-        } else {
-          resolve(dataUrl);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(dataUrlOrFile);
-    });
+      return compressedDataUrl;
+    } catch (err) {
+      console.warn('Image processing error, using fallback:', err);
+      if (typeof dataUrlOrFile === 'string') return dataUrlOrFile;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string) || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(dataUrlOrFile);
+      });
+    }
   },
 };

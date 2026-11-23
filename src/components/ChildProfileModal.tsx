@@ -44,9 +44,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
   const [heightCm, setHeightCm] = useState(115);
   const [weightKg, setWeightKg] = useState(20);
   const [waistCm, setWaistCm] = useState(52);
-  const [photoUrl, setPhotoUrl] = useState(
-    'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80'
-  );
+  const [photoUrl, setPhotoUrl] = useState('');
   const [previewAnalysis, setPreviewAnalysis] = useState<BodyProportionAnalysis | null>(null);
 
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
@@ -71,7 +69,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
         setHeightCm(115);
         setWeightKg(20);
         setWaistCm(52);
-        setPhotoUrl('https://images.unsplash.com/photo-1543087903-1ac2ec7aa8c5?auto=format&fit=crop&w=400&q=80');
+        setPhotoUrl('');
         setPreviewAnalysis(null);
       }
     }
