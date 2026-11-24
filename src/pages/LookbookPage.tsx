@@ -51,8 +51,8 @@ export const LookbookPage: React.FC = () => {
           onClick={() => setFilterByCurrentChild(!filterByCurrentChild)}
           className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
             filterByCurrentChild
-              ? 'bg-pastel-coral text-white border-pastel-coral'
-              : 'bg-white text-stone-600 border-stone-200'
+              ? 'bg-[#8B68BD] text-white border-[#7A56AE]'
+              : 'bg-white text-[#5A4F6B] border-[#EAE2F3] hover:bg-[#F4EFFA]'
           }`}
         >
           {filterByCurrentChild ? `${safeChildName} (${t('currentChildOnly')})` : t('allChildren')}
@@ -63,13 +63,13 @@ export const LookbookPage: React.FC = () => {
 
       {/* Lookbooks Gallery */}
       {displayLookbooks.length === 0 ? (
-        <div className="bg-white rounded-3xl p-8 border border-stone-200/80 text-center space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-pastel-coral-light flex items-center justify-center text-pastel-coral">
+        <div className="bg-white rounded-3xl p-8 border border-[#EAE2F3] text-center space-y-3">
+          <div className="w-12 h-12 mx-auto rounded-full bg-[#F4EFFA] flex items-center justify-center text-[#8B68BD]">
             <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-stone-700">{t('emptyLookbookTitle')}</h4>
-            <p className="text-xs text-stone-400 mt-1">{t('emptyLookbookDesc')}</p>
+            <h4 className="text-sm font-bold text-[#231B2E]">{t('emptyLookbookTitle')}</h4>
+            <p className="text-xs text-[#5A4F6B] mt-1">{t('emptyLookbookDesc')}</p>
           </div>
         </div>
       ) : (

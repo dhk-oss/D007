@@ -12,11 +12,20 @@
     BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI",
     "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  --bg-app: #FAF8FC;
+  --bg-card: #FFFFFF;
+  --color-primary: #8B68BD;
+  --color-primary-dark: #7A56AE;
+  --color-primary-light: #F4EFFA;
+  --color-border: #EAE2F3;
+  --text-main: #231B2E;
+  --text-sub: #5A4F6B;
 }
 
 html,
 body {
   font-family: var(--font-sans);
+  background-color: #F1EDF6;
 }
 
 button,
@@ -28,12 +37,12 @@ textarea {
 
 @layer base {
   body {
-    @apply font-sans bg-[#F7F5F0] text-pastel-charcoal min-h-screen flex justify-center;
+    @apply font-sans bg-[#F1EDF6] text-[#231B2E] min-h-screen flex justify-center;
     -webkit-tap-highlight-color: transparent;
   }
 }
 
-/* Custom scrollbar for mobile feel */
+/* Custom scrollbar for mobile feel with soft lavender thumb */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -42,7 +51,7 @@ textarea {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #E0DCD3;
+  background: #D9CEE8;
   border-radius: 9999px;
 }
 

@@ -256,7 +256,7 @@ export const ProfilesPage: React.FC = () => {
         <button
           onClick={handleOpenAddModal}
           disabled={maxLimitReached}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-pastel-coral text-white rounded-2xl text-xs font-bold shadow-soft hover:bg-rose-500 transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#8B68BD] text-white rounded-2xl text-xs font-bold shadow-soft hover:bg-[#7A56AE] transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           <span>{t('addChildBtn')}</span>
@@ -276,8 +276,8 @@ export const ProfilesPage: React.FC = () => {
               onClick={() => setActiveChildId(child.id)}
               className={`flex items-center gap-2.5 p-2 rounded-2xl border transition-all shrink-0 ${
                 isSelected
-                  ? 'bg-white border-pastel-coral shadow-soft ring-2 ring-pastel-coral/20 scale-102'
-                  : 'bg-stone-50 border-stone-200 opacity-75 hover:opacity-100'
+                  ? 'bg-white border-[#8B68BD] shadow-soft ring-2 ring-[#8B68BD]/20 scale-102'
+                  : 'bg-[#FAF8FC] border-[#EAE2F3] opacity-75 hover:opacity-100'
               }`}
             >
               {hasPhoto ? (
@@ -287,16 +287,16 @@ export const ProfilesPage: React.FC = () => {
                   className="w-10 h-10 rounded-xl object-cover"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-xl bg-pastel-coral-light border border-pastel-coral/30 flex items-center justify-center text-sm font-black text-pastel-coral">
+                <div className="w-10 h-10 rounded-xl bg-[#F4EFFA] border border-[#8B68BD]/30 flex items-center justify-center text-sm font-black text-[#8B68BD]">
                   {childDisplayName.slice(0, 1)}
                 </div>
               )}
               <div className="text-left">
-                <div className="font-extrabold text-xs text-stone-800 flex items-center gap-1">
+                <div className="font-extrabold text-xs text-[#231B2E] flex items-center gap-1">
                   <span>{childDisplayName}</span>
-                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-pastel-coral" />}
+                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#8B68BD]" />}
                 </div>
-                <div className="text-[10px] text-stone-500">
+                <div className="text-[10px] text-[#5A4F6B]">
                   {child.gender === 'male' ? t('boy') : t('girl')} • {child.age}세
                 </div>
               </div>
@@ -372,17 +372,17 @@ export const ProfilesPage: React.FC = () => {
           </div>
 
           {/* Body Proportion View */}
-          <div className="pt-3 border-t border-stone-100 space-y-3">
+          <div className="pt-3 border-t border-[#EAE2F3] space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
-                <Activity className="w-4 h-4 text-pastel-coral" />
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#231B2E]">
+                <Activity className="w-4 h-4 text-[#8B68BD]" />
                 <span>{t('proportionAnalysisTitle')}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#FAF5FD] border border-[#EAE2F3] text-[#7A56AE]">
                   {silhouetteLabel}
                 </span>
-                <span className="text-[10px] font-bold text-pastel-coral bg-pastel-coral-light px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold text-[#8B68BD] bg-[#F4EFFA] border border-[#EAE2F3] px-2 py-0.5 rounded-full">
                   {t('ratio')} {ratioBadge}
                 </span>
               </div>
@@ -390,42 +390,42 @@ export const ProfilesPage: React.FC = () => {
 
             {/* Proportion Bar */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-semibold text-stone-600">
+              <div className="flex justify-between text-[11px] font-semibold text-[#5A4F6B]">
                 <span>{t('upperBody')}: {torsoPercent}%</span>
                 <span>{t('lowerBody')}: {legPercent}%</span>
               </div>
-              <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden flex shadow-inner">
+              <div className="w-full h-3 bg-[#FAF8FC] border border-[#EAE2F3] rounded-full overflow-hidden flex shadow-inner">
                 <div
-                  className="bg-amber-400 h-full transition-all duration-500"
+                  className="bg-[#D5C4E9] h-full transition-all duration-500"
                   style={{ width: `${torsoPercent}%` }}
                   title="Torso Ratio"
                 />
                 <div
-                  className="bg-pastel-coral h-full transition-all duration-500"
+                  className="bg-[#8B68BD] h-full transition-all duration-500"
                   style={{ width: `${legPercent}%` }}
                   title="Leg Ratio"
                 />
               </div>
-              <div className="flex justify-between text-[9px] text-stone-400">
+              <div className="flex justify-between text-[9px] text-[#5A4F6B]/70">
                 <span>{t('headToHip')}</span>
                 <span>{t('hipToFeet')}</span>
               </div>
             </div>
 
             {/* AI Summary Card */}
-            <div className="p-3 bg-amber-50/70 border border-amber-200/60 rounded-2xl space-y-1.5">
-              <p className="text-xs text-stone-800 leading-relaxed font-semibold">
+            <div className="p-3 bg-[#F4EFFA] border border-[#EAE2F3] rounded-2xl space-y-1.5">
+              <p className="text-xs text-[#231B2E] leading-relaxed font-semibold">
                 {localizedSummary}
               </p>
               {localizedNotes.length > 0 && (
-                <div className="pt-1.5 border-t border-amber-200/50 space-y-1">
-                  <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider block">
+                <div className="pt-1.5 border-t border-[#EAE2F3] space-y-1">
+                  <span className="text-[10px] font-extrabold text-[#7A56AE] uppercase tracking-wider block">
                     {t('tailoredTipsTitle')}
                   </span>
-                  <ul className="space-y-1 text-xs text-stone-700">
+                  <ul className="space-y-1 text-xs text-[#5A4F6B]">
                     {localizedNotes.map((note, idx) => (
                       <li key={idx} className="flex items-start gap-1.5">
-                        <span className="text-pastel-coral font-bold">•</span>
+                        <span className="text-[#8B68BD] font-bold">•</span>
                         <span className="leading-snug">{note}</span>
                       </li>
                     ))}

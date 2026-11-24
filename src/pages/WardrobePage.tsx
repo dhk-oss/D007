@@ -85,7 +85,7 @@ export const WardrobePage: React.FC = () => {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-pastel-coral text-white rounded-2xl text-xs font-bold shadow-soft hover:bg-rose-500 transition active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#8B68BD] text-white rounded-2xl text-xs font-bold shadow-soft hover:bg-[#7A56AE] transition active:scale-95"
         >
           <Plus className="w-4 h-4" />
           <span>{t('addItem')}</span>
@@ -136,8 +136,8 @@ export const WardrobePage: React.FC = () => {
               onClick={() => setSelectedSeason(season.value)}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${
                 active
-                  ? 'bg-pastel-peach text-stone-800 border border-amber-300'
-                  : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                  ? 'bg-[#F4EFFA] text-[#7A56AE] border border-[#EAE2F3] font-bold'
+                  : 'bg-stone-100 text-stone-500 hover:bg-[#F4EFFA]/60 hover:text-[#5A4F6B]'
               }`}
             >
               {season.label}
@@ -148,17 +148,17 @@ export const WardrobePage: React.FC = () => {
 
       {/* Wardrobe Grid */}
       {filteredItems.length === 0 ? (
-        <div className="bg-white rounded-3xl p-8 border border-stone-200/80 text-center space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-pastel-peach/60 flex items-center justify-center text-pastel-coral">
+        <div className="bg-white rounded-3xl p-8 border border-[#EAE2F3] text-center space-y-3">
+          <div className="w-12 h-12 mx-auto rounded-full bg-[#F4EFFA] flex items-center justify-center text-[#8B68BD]">
             <Tag className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-stone-700">{t('emptyWardrobeTitle')}</h4>
-            <p className="text-xs text-stone-400 mt-1">{t('emptyWardrobeDesc')}</p>
+            <h4 className="text-sm font-bold text-[#231B2E]">{t('emptyWardrobeTitle')}</h4>
+            <p className="text-xs text-[#5A4F6B] mt-1">{t('emptyWardrobeDesc')}</p>
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-pastel-coral-light text-pastel-coral text-xs font-bold rounded-xl hover:bg-pastel-coral hover:text-white transition"
+            className="px-4 py-2 bg-[#F4EFFA] text-[#8B68BD] text-xs font-bold rounded-xl hover:bg-[#8B68BD] hover:text-white transition"
           >
             {t('addItem')}
           </button>

@@ -11,7 +11,7 @@ export const AppContent: React.FC = () => {
   const { activeTab } = useApp();
 
   return (
-    <div className="w-full max-w-[480px] min-h-screen bg-pastel-cream shadow-2xl relative flex flex-col border-x border-stone-200/50">
+    <div className="w-full max-w-[480px] min-h-screen bg-pastel-cream shadow-2xl relative flex flex-col border-x border-[#EAE2F3]">
       {/* Top Header */}
       <Header />
 

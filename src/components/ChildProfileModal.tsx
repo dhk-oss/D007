@@ -385,17 +385,17 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
             </div>
 
             {/* Proportion Estimate Preview */}
-            <div className="p-3 bg-pastel-warm/70 rounded-2xl border border-stone-200 space-y-2">
+            <div className="p-3 bg-[#F4EFFA] rounded-2xl border border-[#EAE2F3] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-stone-700 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-pastel-coral" />
+                <span className="text-xs font-bold text-[#231B2E] flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-[#8B68BD]" />
                   {t('proportionEstimate')}
                 </span>
                 <button
                   type="button"
                   onClick={handleRecalculateProportion}
                   disabled={isAnalyzing}
-                  className="text-[10px] font-bold text-pastel-coral hover:underline flex items-center gap-1"
+                  className="text-[10px] font-bold text-[#7A56AE] hover:underline flex items-center gap-1"
                 >
                   <RefreshCw className={`w-3 h-3 ${isAnalyzing ? 'animate-spin' : ''}`} />
                   <span>{t('recalculate')}</span>
@@ -403,15 +403,15 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
               </div>
 
               {isAnalyzing ? (
-                <div className="text-center py-2 text-xs text-pastel-coral font-bold flex items-center justify-center gap-1.5">
+                <div className="text-center py-2 text-xs text-[#8B68BD] font-bold flex items-center justify-center gap-1.5">
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>{t('analyzingProportion')}</span>
                 </div>
               ) : previewAnalysis ? (
-                <div className="space-y-1 text-xs text-stone-600">
+                <div className="space-y-1 text-xs text-[#5A4F6B]">
                   <div className="flex justify-between font-bold">
                     <span>{t('ratio')}: {previewAnalysis.upperToLowerRatio}</span>
-                    <span className="capitalize text-amber-700">
+                    <span className="capitalize text-[#7A56AE]">
                       {getLocalizedSilhouetteLabel(previewAnalysis.silhouetteType, locale)}
                     </span>
                   </div>
@@ -420,7 +420,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <p className="text-[11px] text-stone-400">
+                <p className="text-[11px] text-[#5A4F6B]/60">
                   {t('takePhotoHint')}
                 </p>
               )}

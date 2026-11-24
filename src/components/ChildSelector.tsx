@@ -74,7 +74,7 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
         <button
           type="button"
           onClick={() => setIsSelectOpen(true)}
-          className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-white border border-pastel-peach text-stone-700 text-xs font-bold hover:bg-pastel-coral-light transition shadow-2xs"
+          className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-white border border-[#EAE2F3] text-[#231B2E] text-xs font-bold hover:bg-[#F4EFFA] transition shadow-2xs"
           title={t('selectChild' as any) || 'Select Child'}
         >
           {activeChild && (
@@ -85,29 +85,29 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
                 className="w-5 h-5 rounded-full object-cover"
               />
             ) : (
-              <div className="w-5 h-5 rounded-full bg-pastel-coral-light border border-pastel-coral/30 flex items-center justify-center text-[10px] font-black text-pastel-coral">
+              <div className="w-5 h-5 rounded-full bg-[#F4EFFA] border border-[#8B68BD]/30 flex items-center justify-center text-[10px] font-black text-[#8B68BD]">
                 {getLocalizedChildName(activeChild.name, locale).slice(0, 1)}
               </div>
             )
           )}
-          <span className="max-w-[90px] truncate font-extrabold text-stone-800">
+          <span className="max-w-[90px] truncate font-extrabold text-[#231B2E]">
             {activeChild ? getLocalizedChildName(activeChild.name, locale) : ''}
           </span>
           {activeChild && (
-            <span className="text-[10px] text-stone-500 font-semibold bg-stone-100 px-1.5 py-0.2 rounded-full">
+            <span className="text-[10px] text-[#5A4F6B] font-semibold bg-[#F4EFFA] px-1.5 py-0.2 rounded-full border border-[#EAE2F3]">
               {formatChildAge(activeChild.age, locale)}
             </span>
           )}
-          <ChevronDown className="w-3 h-3 text-stone-400" />
+          <ChevronDown className="w-3 h-3 text-[#5A4F6B]" />
         </button>
         {showManageButtons && activeChild && (
           <button
             type="button"
             onClick={() => handleEdit(activeChild)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-stone-200 text-stone-600 bg-white text-xs font-semibold shrink-0 hover:bg-stone-50 hover:border-stone-400 transition"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-[#EAE2F3] text-[#5A4F6B] bg-white text-xs font-semibold shrink-0 hover:bg-[#F4EFFA] hover:text-[#7A56AE] hover:border-[#8B68BD]/40 transition"
             title={t('editChildBtn')}
           >
-            <Settings className="w-3.5 h-3.5 text-stone-500" />
+            <Settings className="w-3.5 h-3.5 text-[#5A4F6B]" />
             <span className="text-[11px]">{t('editChildBtn')}</span>
           </button>
         )}
@@ -151,7 +151,7 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
                         setIsSelectOpen(false);
                       }}
                       className={`flex items-center gap-2.5 w-full p-2.5 rounded-xl transition ${
-                        isSelected ? 'bg-pastel-coral text-white shadow-soft' : 'bg-stone-50 text-stone-800 hover:bg-stone-100'
+                        isSelected ? 'bg-[#8B68BD] text-white shadow-soft' : 'bg-[#FAF8FC] text-[#231B2E] hover:bg-[#F4EFFA]'
                       }`}
                     >
                       {hasPhoto ? (
@@ -165,14 +165,14 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
                           className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                             isSelected
                               ? 'bg-white/20 text-white'
-                              : 'bg-pastel-coral-light text-pastel-coral border border-pastel-coral/30'
+                              : 'bg-[#F4EFFA] text-[#8B68BD] border border-[#8B68BD]/30'
                           }`}
                         >
                           {localizedName.slice(0, 1)}
                         </div>
                       )}
                       <span className="font-bold text-xs truncate flex-1 text-left">{localizedName}</span>
-                      <span className={`text-[11px] font-medium ${isSelected ? 'text-white/80' : 'text-stone-400'}`}>
+                      <span className={`text-[11px] font-medium ${isSelected ? 'text-white/80' : 'text-[#5A4F6B]'}`}>
                         {formatChildAge(child.age, locale)}
                       </span>
                       {isSelected && <Check className="w-4 h-4 text-white stroke-[3]" />}
@@ -181,12 +181,12 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
                 })}
               </div>
               {/* Footer */}
-              <div className="shrink-0 p-3 border-t border-stone-100 flex justify-between items-center">
+              <div className="shrink-0 p-3 border-t border-[#EAE2F3] flex justify-between items-center">
                 {canAddMore && (
                   <button
                     type="button"
                     onClick={handleAdd}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-pastel-coral text-pastel-coral bg-pastel-coral-light/60 text-xs font-bold hover:bg-pastel-coral-light transition"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-[#8B68BD] text-[#7A56AE] bg-[#F4EFFA]/80 text-xs font-bold hover:bg-[#F4EFFA] transition"
                     title={t('addChildBtn')}
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[3]" />

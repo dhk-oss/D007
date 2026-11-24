@@ -31,7 +31,7 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 max-w-[480px] mx-auto bg-white/95 backdrop-blur-md border-t border-stone-200/60 px-4 py-2 safe-bottom shadow-nav">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 max-w-[480px] mx-auto bg-white/95 backdrop-blur-md border-t border-[#EAE2F3] px-4 py-2 safe-bottom shadow-nav">
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -42,20 +42,20 @@ export const BottomNav: React.FC = () => {
               onClick={() => setActiveTab(item.id)}
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all duration-200 ${
                 isActive
-                  ? 'text-pastel-coral scale-105'
-                  : 'text-stone-400 hover:text-stone-600'
+                  ? 'text-[#8B68BD] scale-105'
+                  : 'text-[#8C829B] hover:text-[#5A4F6B]'
               }`}
             >
               <div
                 className={`p-1.5 rounded-xl transition-all ${
-                  isActive ? 'bg-pastel-coral-light' : 'bg-transparent'
+                  isActive ? 'bg-[#F4EFFA]' : 'bg-transparent'
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
               </div>
               <span
                 className={`text-[11px] mt-0.5 tracking-tight font-medium ${
-                  isActive ? 'font-bold text-pastel-coral' : 'text-stone-400'
+                  isActive ? 'font-bold text-[#7A56AE]' : 'text-[#8C829B]'
                 }`}
               >
                 {item.label}

@@ -106,12 +106,12 @@ export const LocationSelectorModal: React.FC<LocationSelectorModalProps> = ({
             type="button"
             onClick={handleDetectGps}
             disabled={isLocating}
-            className="w-full py-2.5 px-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-300/80 text-amber-900 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50"
+            className="w-full py-2.5 px-3 rounded-2xl bg-[#F4EFFA] hover:bg-[#EAE2F3] border border-[#D5C4E9] text-[#231B2E] text-xs font-bold flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50"
           >
             {isLocating ? (
-              <Loader2 className="w-4 h-4 animate-spin text-pastel-coral" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#8B68BD]" />
             ) : (
-              <Navigation className="w-4 h-4 text-pastel-coral" />
+              <Navigation className="w-4 h-4 text-[#8B68BD]" />
             )}
             <span>
               {isLocating
