@@ -30,6 +30,7 @@ import {
   getLocalizedLocation,
   getLocalizedWeatherBadge,
   formatHighLowTemps,
+  getLocalizedChildName,
 } from '../utils/localeHelpers';
 
 const isValidCustomPhoto = (url?: string | null): boolean =>
@@ -400,7 +401,7 @@ export const HomePage: React.FC = () => {
           ) : isValidCustomPhoto(activeChild?.fullBodyPhotoUrl) ? (
             <img
               src={activeChild!.fullBodyPhotoUrl}
-              alt={activeChild!.name}
+              alt={getLocalizedChildName(activeChild!.name, locale)}
               className="w-full h-full object-cover object-top"
             />
           ) : (
@@ -569,7 +570,7 @@ export const HomePage: React.FC = () => {
       <WardrobePickerModal
         isOpen={isSwapModalOpen}
         onClose={() => setIsSwapModalOpen(false)}
-        childName={safeChild.name}
+        childName={getLocalizedChildName(safeChild.name, locale)}
         categoryFilter={swapCategory}
         wardrobeItems={childWardrobe}
         currentlySelectedItemId={activeItems.find((i) => i.category === swapCategory)?.id}

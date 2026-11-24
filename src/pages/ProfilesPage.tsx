@@ -439,7 +439,10 @@ export const ProfilesPage: React.FC = () => {
               <button
                 onClick={() => {
                   setEditingChild(activeChild);
-                  setName(activeChild.name);
+                  const initialName = isDefaultChildName(activeChild.name)
+                    ? getLocalizedChildName(activeChild.name, locale)
+                    : activeChild.name;
+                  setName(initialName);
                   setGender(activeChild.gender);
                   setAge(activeChild.age);
                   setHeightCm(activeChild.heightCm);
@@ -476,7 +479,7 @@ export const ProfilesPage: React.FC = () => {
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}
         onCapture={handleCameraCapture}
-        childName={name || activeChild?.name}
+        childName={getLocalizedChildName(name || activeChild?.name || '', locale)}
       />
 
       {/* Add / Edit Profile Modal */}

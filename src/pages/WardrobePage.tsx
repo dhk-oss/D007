@@ -11,6 +11,7 @@ import {
   getLocalizedColor,
   getLocalizedSeason,
 } from '../utils/wardrobeLocalization';
+import { getLocalizedChildName } from '../utils/localeHelpers';
 
 export const WardrobePage: React.FC = () => {
   const { activeChild, childrenList, wardrobe, addWardrobeItem, deleteWardrobeItem } = useApp();
@@ -67,7 +68,7 @@ export const WardrobePage: React.FC = () => {
     addWardrobeItem(itemData);
   };
 
-  const childName = activeChild?.name ? activeChild.name.split(' ')[0] : 'Child';
+  const childName = activeChild?.name ? getLocalizedChildName(activeChild.name, locale) : 'Child';
 
   return (
     <div className="p-4 space-y-4">
@@ -76,7 +77,10 @@ export const WardrobePage: React.FC = () => {
         <div>
           <h2 className="text-lg font-black text-stone-800 tracking-tight">{t('wardrobeTitle')}</h2>
           <p className="text-xs text-stone-500">
-            {childName}{t('closetCollection')} ({childItems.length} {t('itemsRegistered')})
+            {locale === 'es' || locale === 'ru' || locale === 'pt' || locale === 'fr'
+              ? `${t('closetCollection')}${childName}`
+              : `${childName}${t('closetCollection')}`
+            } ({childItems.length} {t('itemsRegistered')})
           </p>
         </div>
         <button

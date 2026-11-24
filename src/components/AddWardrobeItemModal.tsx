@@ -179,7 +179,7 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
                   >
                     <img
                       src={child.fullBodyPhotoUrl}
-                      alt={child.name}
+                      alt={getLocalizedChildName(child.name, locale)}
                       className="w-4 h-4 rounded-full object-cover"
                     />
                     <span>{getLocalizedChildName(child.name, locale)}</span>
@@ -258,7 +258,7 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
                   isOpen={isCameraModalOpen}
                   onClose={() => setIsCameraModalOpen(false)}
                   onCapture={handleCameraCapture}
-                  childName={selectedChild?.name}
+                  childName={selectedChild ? getLocalizedChildName(selectedChild.name, locale) : undefined}
                 />
                 <input
                   ref={fileInputRef}

@@ -455,7 +455,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}
         onCapture={handleCameraCapture}
-        childName={name}
+        childName={getLocalizedChildName(name || childToEdit?.name || '', locale)}
       />
     </>
   );
