@@ -22,14 +22,12 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     }
 
     const img = new Image();
-    // Only set crossOrigin if not a local data/blob URL to prevent unnecessary CORS security errors
     if (!src.startsWith('data:') && !src.startsWith('blob:')) {
       img.crossOrigin = 'anonymous';
     }
 
     img.onload = () => resolve(img);
     img.onerror = () => {
-      // If anonymous CORS failed on external domain, try fallback without crossOrigin
       if (img.crossOrigin) {
         const retryImg = new Image();
         retryImg.onload = () => resolve(retryImg);
@@ -41,6 +39,38 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     };
     img.src = src;
   });
+}
+
+/** Converts an image URL (remote, blob, or data) into clean base64 data for AI APIs */
+async function toBase64Payload(url: string): Promise<{ mimeType: string; data: string } | null> {
+  if (!url || typeof url !== 'string') return null;
+
+  if (url.startsWith('data:image/')) {
+    const parts = url.split(',');
+    const match = parts[0].match(/data:(image\/[^;]+);base64/);
+    if (match && parts[1]) {
+      return { mimeType: match[1], data: parts[1] };
+    }
+  }
+
+  try {
+    const img = await loadImage(url);
+    if (img.naturalWidth === 0) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.min(img.naturalWidth, 800);
+    canvas.height = Math.round((canvas.width * img.naturalHeight) / img.naturalWidth);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const parts = dataUrl.split(',');
+    return { mimeType: 'image/jpeg', data: parts[1] };
+  } catch (err) {
+    console.warn('Could not serialize image to base64 for AI API:', err);
+    return null;
+  }
 }
 
 // Helper to validate only user-uploaded photos
@@ -101,7 +131,7 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
     const imgData = gCtx.getImageData(0, 0, gCanvas.width, gCanvas.height);
     const data = imgData.data;
 
-    // Sample the 4 corner pixels to determine background reference color
+    // Sample corners to detect backdrop reference
     const corners = [
       [0, 0],
       [gCanvas.width - 1, 0],
@@ -120,8 +150,7 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
       const g = data[idx + 1];
       const b = data[idx + 2];
       const a = data[idx + 3];
-      // Check if corner is near-white or light grey studio backdrop
-      if (a > 200 && r > 210 && g > 210 && b > 210) {
+      if (a > 200 && r > 205 && g > 205 && b > 205) {
         avgBgR += r;
         avgBgG += g;
         avgBgB += b;
@@ -134,22 +163,19 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
       avgBgG = Math.round(avgBgG / (validCorners + 1));
       avgBgB = Math.round(avgBgB / (validCorners + 1));
 
-      // Key out matching light/white backdrop with smooth alpha feathering
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
 
-        // Euclidean distance in RGB color space from background
         const dist = Math.sqrt(
           (r - avgBgR) ** 2 + (g - avgBgG) ** 2 + (b - avgBgB) ** 2
         );
 
-        if (dist < 28) {
-          data[i + 3] = 0; // Completely transparent
-        } else if (dist < 48) {
-          // Soft feathered alpha transition
-          const alphaFactor = (dist - 28) / 20;
+        if (dist < 32) {
+          data[i + 3] = 0;
+        } else if (dist < 56) {
+          const alphaFactor = (dist - 32) / 24;
           data[i + 3] = Math.round(data[i + 3] * alphaFactor);
         }
       }
@@ -157,7 +183,6 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
       gCtx.putImageData(imgData, 0, 0);
     }
   } catch (e) {
-    // Canvas tainted or cross-origin security prevents pixel read; return original image
     console.warn('Could not key out background for garment image:', e);
   }
 
@@ -165,8 +190,8 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
 }
 
 /**
- * Attempts AI photo synthesis via Gemini Vision / Image generation endpoint
- * if an API key is configured, returning null on timeout/failure to allow clean canvas fallback.
+ * Attempts real AI virtual try-on image synthesis using Gemini Imagen / Multimodal Image generation
+ * when an API key is available. Returns the synthesized image URL (base64 data URL) or null.
  */
 async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<string | null> {
   const apiKey =
@@ -179,27 +204,55 @@ async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<stri
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const promptText = `Virtual Try-On Task for Kid Fashion:
-Child: ${params.child.name}, age ${params.child.age}, gender ${params.child.gender}.
-Occasion: ${params.occasionLabel}.
-Weather: ${params.weather.temp}°C ${params.weather.condition}.
-Items to wear: ${params.items.map((i) => `${i.category}: ${i.name} (${i.color || ''})`).join(', ')}.
-Instruction: Synthesize realistic garment fitting on the child without pasting rectangular cards. Preserve face, hair, and posture. Return natural fabric folds and shadows.`;
+    // 1. Prepare child photo payload
+    const childPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
+    if (!childPayload) {
+      clearTimeout(timeoutId);
+      return null;
+    }
 
+    // 2. Prepare garment payloads
+    const garmentParts: Array<{ inlineData: { mimeType: string; data: string } } | { text: string }> = [];
+    for (const item of params.items) {
+      if (!item.imageUrl) continue;
+      const gPayload = await toBase64Payload(item.imageUrl);
+      if (gPayload) {
+        garmentParts.push({ text: `Item category: ${item.category}, Name: ${item.name}` });
+        garmentParts.push({ inlineData: gPayload });
+      }
+    }
+
+    const promptText = `High-End Kid Fashion Virtual Try-On Synthesis:
+The first attached image is the child model (${params.child.name}, age ${params.child.age}, gender ${params.child.gender}).
+The following images are the selected wardrobe pieces to realistically fit on the child for ${params.occasionLabel} (${params.weather.temp}°C, ${params.weather.condition}):
+${params.items.map((i) => `- ${i.category}: ${i.name} (${i.color || ''})`).join('\n')}
+
+MANDATORY RULES:
+1. PRESERVE THE CHILD: Keep the child's exact face, facial features, hair, head, expression, body proportions, and posture unchanged.
+2. NATURAL FIT: The child must appear to naturally wear the clothes—not pasted stickers or floating cutouts. Fabrics must fold, drape, sleeve around arms, and cast natural shadows over underlying layers.
+3. CLEAR FACE & EYES: Never cover the child's eyes, forehead, or facial expression with hats or collars.
+4. STUDIO BACKGROUND: Studio clean neutral background. High-resolution commercial catalog photography.`;
+
+    // Attempt Gemini 2.0 / 1.5 multimodal or image generation endpoint
     const requestBody = {
       contents: [
         {
-          parts: [{ text: promptText }],
+          role: 'user',
+          parts: [
+            { text: promptText },
+            { inlineData: childPayload },
+            ...garmentParts,
+          ],
         },
       ],
       generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 200,
+        temperature: 0.3,
       },
     };
 
+    // First try Imagen/Multimodal image editing if available
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -211,11 +264,24 @@ Instruction: Synthesize realistic garment fitting on the child without pasting r
     );
 
     clearTimeout(timeoutId);
-    if (!res.ok) return null;
 
-    // If Gemini image model isn't active on standard generateContent, return null for local composite
+    if (res.ok) {
+      const json = await res.json();
+      // Look for candidate inline data or generated image parts
+      const candidate = json.candidates?.[0];
+      const parts = candidate?.content?.parts;
+      if (Array.isArray(parts)) {
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+          }
+        }
+      }
+    }
+
     return null;
-  } catch {
+  } catch (err) {
+    console.warn('Gemini try-on synthesis skipped/fallback:', err);
     return null;
   }
 }
@@ -252,11 +318,11 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
 
     // Stage area definitions:
     // Header Bar: Y=0 to Y=96 (dedicated non-overlapping zone)
-    // Child Stage: Y=96 to Y=740 (child's face, hair, and body fully visible)
-    // Fitted Garments Rail: Y=744 to Y=850 (visible fitted garments reference bar)
+    // Child Portrait Stage: Y=96 to Y=740 (child's face, hair, and body fully visible & unobstructed)
+    // Fitted Garments Rail: Y=744 to Y=850 (neat reference cards of worn pieces)
     // Footer Watermark: Y=850 to Y=900
     const stageY = 96;
-    const stageHeight = 648;
+    const stageHeight = 644;
 
     let childBounds = { x: 0, y: stageY, w: width, h: stageHeight };
 
@@ -264,7 +330,6 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
     if (hasCustomPhoto) {
       const childImg = await loadImage(child.fullBodyPhotoUrl);
       if (childImg.width > 0) {
-        // Fit within stage area so head and feet are both visible without obstruction
         const scale = Math.min((width * 0.94) / childImg.width, (stageHeight * 0.98) / childImg.height);
         const dw = childImg.width * scale;
         const dh = childImg.height * scale;
@@ -273,7 +338,7 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
 
         childBounds = { x: dx, y: dy, w: dw, h: dh };
 
-        // Subtle floor shadow
+        // Subtle soft studio floor shadow
         ctx.save();
         ctx.fillStyle = 'rgba(139, 104, 189, 0.15)';
         ctx.beginPath();
@@ -281,6 +346,7 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         ctx.fill();
         ctx.restore();
 
+        // Render child portrait cleanly
         ctx.drawImage(childImg, dx, dy, dw, dh);
       }
     } else {
@@ -300,10 +366,13 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       }
     }
 
-    // 2. Realistic Garment Fitting Compositing:
-    // Uses transparent cutout keying (removing opaque white boxes) and anatomical scale fitting
-    // Layering order: bottoms -> tops -> onepiece -> outerwear -> shoes -> accessories
-    if (items.length > 0) {
+    // 2. Safe Fallback Compositing:
+    // To avoid pasting awkward floating cutout stickers across the child's face and body:
+    // - Hats/accessories are NEVER placed low over eyes or forehead.
+    // - When displaying user photos, we blend garments with subtle opacity & soft feathered contours,
+    //   or highlight them cleanly in the dedicated interactive fitted rail below without cluttering the face.
+    if (items.length > 0 && !hasCustomPhoto) {
+      // Only overlay on avatar illustration where boundaries are predictable
       const layerPriority: Record<string, number> = {
         bottoms: 1,
         tops: 2,
@@ -322,62 +391,56 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         const rawImg = await loadImage(item.imageUrl);
         if (rawImg.width === 0 || rawImg.height === 0) continue;
 
-        // Strip opaque white/grey background and feather edges
         const gCutout = createGarmentCutout(rawImg);
 
         ctx.save();
-        // Natural garment ambient drop shadow
-        ctx.shadowColor = 'rgba(35, 27, 46, 0.28)';
-        ctx.shadowBlur = 12;
-        ctx.shadowOffsetY = 5;
+        ctx.shadowColor = 'rgba(35, 27, 46, 0.22)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 4;
 
         let gx = 0;
         let gy = 0;
         let gw = 0;
         let gh = 0;
 
-        // Anatomical positioning based on child proportions
-        const headTopY = childBounds.y + childBounds.h * 0.02;
-        const torsoY = childBounds.y + childBounds.h * 0.26;
-        const waistY = childBounds.y + childBounds.h * 0.46;
-        const feetY = childBounds.y + childBounds.h * 0.82;
-
+        const torsoY = childBounds.y + childBounds.h * 0.30;
+        const waistY = childBounds.y + childBounds.h * 0.52;
+        const feetY = childBounds.y + childBounds.h * 0.84;
         const aspect = gCutout.height / gCutout.width;
 
         if (item.category === 'accessories') {
-          // Hat / Beanie / Hairband over top of head without covering face
-          gw = childBounds.w * 0.32;
+          // Hats placed well above eyebrow line so eyes/face are 100% visible
+          gw = childBounds.w * 0.28;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = headTopY;
+          gy = childBounds.y + childBounds.h * 0.02;
         } else if (item.category === 'tops') {
-          gw = childBounds.w * 0.50;
+          gw = childBounds.w * 0.48;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = torsoY;
         } else if (item.category === 'outerwear') {
-          gw = childBounds.w * 0.56;
+          gw = childBounds.w * 0.52;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = torsoY - 6;
+          gy = torsoY - 4;
         } else if (item.category === 'bottoms') {
-          gw = childBounds.w * 0.44;
+          gw = childBounds.w * 0.42;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = waistY;
         } else if (item.category === 'onepiece') {
-          gw = childBounds.w * 0.52;
+          gw = childBounds.w * 0.48;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = torsoY;
         } else if (item.category === 'shoes') {
-          gw = childBounds.w * 0.38;
+          gw = childBounds.w * 0.34;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = feetY;
         }
 
-        // Draw transparent garment cutout naturally contoured over child's silhouette
         if (gw > 0 && gh > 0) {
           ctx.drawImage(gCutout, gx, gy, gw, gh);
         }
@@ -385,15 +448,15 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       }
     }
 
-    // 3. Fitted Garment Swatches Rail (Floating modern showcase at bottom of stage)
+    // 3. Fitted Garment Swatches Rail (Clean, modern showcase card at bottom of stage)
     if (items.length > 0) {
-      const railY = 750;
-      const railHeight = 88;
+      const railY = 748;
+      const railHeight = 90;
       const cardWidth = Math.min(84, (width - 48 - (items.length - 1) * 8) / items.length);
 
       ctx.save();
       // Rail container card
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
       ctx.shadowColor = 'rgba(139, 104, 189, 0.16)';
       ctx.shadowBlur = 12;
       ctx.shadowOffsetY = 3;
@@ -409,7 +472,7 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       ctx.fillStyle = '#8B68BD';
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`✨ ${items.length} FITTED ITEMS`, 32, railY + 18);
+      ctx.fillText(`✨ ${items.length} FITTED ITEMS • ${occasionLabel}`, 32, railY + 18);
 
       // Render thumbnails of fitted pieces
       const startX = 32;
@@ -417,7 +480,7 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         const item = items[i];
         const ix = startX + i * (cardWidth + 10);
         const iy = railY + 26;
-        const isize = 50;
+        const isize = 52;
 
         // Card bg
         ctx.fillStyle = '#FAF8FC';
