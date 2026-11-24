@@ -390,18 +390,19 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* Canvas Display */}
-        <div className="relative rounded-2xl overflow-hidden bg-[#231B2E] border border-[#EAE2F3] aspect-[3/4] flex items-center justify-center">
-          {isValidCustomPhoto(tryOnImageUrl) ? (
+        <div className="relative rounded-2xl overflow-hidden bg-[#FAF8FC] border border-[#EAE2F3] aspect-[3/4] flex items-center justify-center shadow-inner">
+          {tryOnImageUrl ? (
             <img
-              src={tryOnImageUrl!}
+              key={tryOnImageUrl.slice(-40)}
+              src={tryOnImageUrl}
               alt="Virtual Try-On Fitting"
-              className="w-full h-full object-cover animate-fade-in"
+              className="w-full h-full object-contain animate-fade-in"
             />
           ) : isValidCustomPhoto(activeChild?.fullBodyPhotoUrl) ? (
             <img
               src={activeChild!.fullBodyPhotoUrl}
               alt={getLocalizedChildName(activeChild!.name, locale)}
-              className="w-full h-full object-cover object-top"
+              className="w-full h-full object-contain object-center"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-[#FAF8FC]">
@@ -410,7 +411,7 @@ export const HomePage: React.FC = () => {
           )}
 
           {isGenerating && (
-            <div className="absolute inset-0 bg-[#231B2E]/65 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
+            <div className="absolute inset-0 bg-[#231B2E]/65 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white z-10">
               <RefreshCw className="w-8 h-8 animate-spin text-[#B493DB]" />
               <span className="text-xs font-extrabold">{t('stylingInProgress')}</span>
             </div>
