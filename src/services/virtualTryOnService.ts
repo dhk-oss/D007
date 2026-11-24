@@ -9,8 +9,14 @@ export interface VirtualTryOnParams {
   locale?: string;
 }
 
+export interface VirtualTryOnResult {
+  imageUrl: string;
+  isAiGenerated: boolean;
+  providerName?: string;
+}
+
 export interface VirtualTryOnProvider {
-  renderTryOn(params: VirtualTryOnParams): Promise<string>;
+  renderTryOn(params: VirtualTryOnParams): Promise<VirtualTryOnResult>;
 }
 
 /** Loads an image URL safely into an HTMLImageElement with CORS fallback */
@@ -225,10 +231,20 @@ function createGarmentCutout(sourceImg: HTMLImageElement, isOpenOuterwear = fals
 }
 
 /**
+ * Candidate Gemini models supporting multimodal image output or multimodal instruction synthesis.
+ */
+const GEMINI_IMAGE_MODELS = [
+  'gemini-2.0-flash-exp-image-generation',
+  'gemini-2.5-flash-image',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+];
+
+/**
  * Attempts real AI virtual try-on image synthesis using Gemini Imagen / Multimodal Image generation
  * when an API key is available. Returns the synthesized image URL (base64 data URL) or null.
  */
-async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<string | null> {
+async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<{ imageUrl: string; model: string } | null> {
   const apiKey =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) ||
     (typeof window !== 'undefined' && (window as unknown as { __GEMINI_API_KEY__?: string }).__GEMINI_API_KEY__);
@@ -237,98 +253,106 @@ async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<stri
     return null;
   }
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
+  // 1. Prepare child photo payload
+  const childPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
+  if (!childPayload) {
+    return null;
+  }
 
-    // 1. Prepare child photo payload
-    const childPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
-    if (!childPayload) {
-      clearTimeout(timeoutId);
-      return null;
+  // 2. Prepare garment payloads
+  const garmentParts: Array<{ inlineData: { mimeType: string; data: string } } | { text: string }> = [];
+  for (const item of params.items) {
+    if (!item.imageUrl) continue;
+    const gPayload = await toBase64Payload(item.imageUrl);
+    if (gPayload) {
+      garmentParts.push({ text: `Garment Item [Category: ${item.category}, Name: ${item.name}, Color: ${item.color || 'auto'}]` });
+      garmentParts.push({ inlineData: gPayload });
     }
+  }
 
-    // 2. Prepare garment payloads
-    const garmentParts: Array<{ inlineData: { mimeType: string; data: string } } | { text: string }> = [];
-    for (const item of params.items) {
-      if (!item.imageUrl) continue;
-      const gPayload = await toBase64Payload(item.imageUrl);
-      if (gPayload) {
-        garmentParts.push({ text: `Selected Item [Category: ${item.category}, Name: ${item.name}, Color: ${item.color || 'auto'}]` });
-        garmentParts.push({ inlineData: gPayload });
-      }
-    }
-
-    const promptText = `High-End Commercial Fashion Virtual Try-On Studio:
+  const promptText = `High-End Commercial Fashion Virtual Try-On Studio:
 Subject Model: Child ${params.child.name}, age ${params.child.age}, gender ${params.child.gender}.
 Occasion: ${params.occasionLabel} (${params.weather.temp}°C, ${params.weather.condition}).
 
 Styling Task:
-Render the child model realistically dressed in the selected wardrobe ensemble.
-Strict requirements:
-1. FACIAL INTEGRITY: Keep the exact face, eyes, hair, head, and joyful expression of the child in the first photo unaltered.
-2. DETERMINISTIC WEARING ORDER: Layer garments in the exact physical sequence: tops (or onepiece) -> bottoms -> shoes -> outerwear -> accessories.
-3. OPEN OUTERWEAR TO REVEAL INNER TOP: If outerwear (jacket/cardigan/coat) is worn, it MUST appear open in the center-front (unzipped/unbuttoned) so the inner top or onepiece worn underneath is clearly visible and layered naturally beneath it.
-4. NATURAL WEARING: Outerwear wraps comfortably over shoulders and arms. Fabrics must fold, drape, and cast natural shadows over underlying layers.
-5. CLEAR SIGHTLINE: Hats or hair accessories must sit naturally atop hair without obscuring the child's eyes or forehead.
-6. STUDIO FINISH: Clean studio background, premium catalog quality.`;
+Generate a single photorealistic studio fashion photograph of this exact child model naturally and realistically wearing the selected garments.
+Strict rules:
+1. FACIAL & PHYSICAL IDENTITY: Retain the exact face, eyes, hair, head, expression, body proportions, and skin tone from the child's photo.
+2. DETERMINISTIC WEARING ORDER: Layer garments in the sequence: tops (or onepiece) -> bottoms -> shoes -> outerwear -> accessories.
+3. OPEN OUTERWEAR TO REVEAL INNER TOP: Outerwear MUST appear open in the center-front (unzipped/unbuttoned) so the inner top or onepiece underneath is clearly visible.
+4. FABRIC REALISM: Clothing must contour naturally to the child's body with authentic folds, seams, sleeves around arms, and ambient shadows. No floating cutouts or stickers.
+5. CLEAR SIGHTLINE: Hats or hair accessories sit comfortably above eyebrows without covering eyes or face.
+6. Clean neutral soft studio backdrop, high-end catalog quality.`;
 
-    const requestBody = {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: promptText },
-            { inlineData: childPayload },
-            ...garmentParts,
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.3,
-      },
-    };
-
-    // Try Gemini image generation / multimodal synthesis
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  const requestBody = {
+    contents: [
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      }
-    );
+        role: 'user',
+        parts: [
+          { text: promptText },
+          { inlineData: childPayload },
+          ...garmentParts,
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+    },
+  };
 
-    clearTimeout(timeoutId);
+  // Try candidate image generation / multimodal models with fallback
+  for (const model of GEMINI_IMAGE_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
 
-    if (res.ok) {
-      const json = await res.json();
-      const candidate = json.candidates?.[0];
-      const parts = candidate?.content?.parts;
-      if (Array.isArray(parts)) {
-        for (const part of parts) {
-          if (part.inlineData?.data) {
-            return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        const candidate = json.candidates?.[0];
+        const parts = candidate?.content?.parts;
+        if (Array.isArray(parts)) {
+          for (const part of parts) {
+            if (part.inlineData?.data) {
+              return {
+                imageUrl: `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`,
+                model,
+              };
+            }
           }
         }
       }
+    } catch {
+      // Continue to next model on error or timeout
+      continue;
     }
-
-    return null;
-  } catch (err) {
-    console.warn('Gemini try-on synthesis skipped/fallback:', err);
-    return null;
   }
+
+  return null;
 }
 
 /** High-fidelity HTML5 Canvas Virtual Try-On Compositor */
 export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
-  async renderTryOn(params: VirtualTryOnParams): Promise<string> {
+  async renderTryOn(params: VirtualTryOnParams): Promise<VirtualTryOnResult> {
     // 1. Try Gemini AI synthesis if available
     const geminiResult = await trySynthesizeWithGemini(params);
     if (geminiResult) {
-      return geminiResult;
+      return {
+        imageUrl: geminiResult.imageUrl,
+        isAiGenerated: true,
+        providerName: `Gemini AI (${geminiResult.model})`,
+      };
     }
 
     const { child, items = [], occasionLabel, weather, locale = 'ko' } = params;
@@ -339,7 +363,13 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return child.fullBodyPhotoUrl;
+    if (!ctx) {
+      return {
+        imageUrl: child.fullBodyPhotoUrl,
+        isAiGenerated: false,
+        providerName: 'Photo Fallback',
+      };
+    }
 
     const hasCustomPhoto = isValidCustomPhoto(child.fullBodyPhotoUrl);
     const localizedName = getLocalizedChildName(child.name, locale);
@@ -591,7 +621,11 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
     );
     ctx.restore();
 
-    return canvas.toDataURL('image/jpeg', 0.92);
+    return {
+      imageUrl: canvas.toDataURL('image/jpeg', 0.92),
+      isAiGenerated: false,
+      providerName: 'Canvas Compositor',
+    };
   }
 
   /** Rounded rectangle helper */
@@ -620,6 +654,6 @@ export function setVirtualTryOnProvider(provider: VirtualTryOnProvider) {
   tryOnRenderer = provider;
 }
 
-export async function generateVirtualTryOn(params: VirtualTryOnParams): Promise<string> {
+export async function generateVirtualTryOn(params: VirtualTryOnParams): Promise<VirtualTryOnResult> {
   return tryOnRenderer.renderTryOn(params);
 }

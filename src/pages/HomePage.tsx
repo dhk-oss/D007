@@ -94,6 +94,7 @@ export const HomePage: React.FC = () => {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tryOnImageUrl, setTryOnImageUrl] = useState<string | null>(null);
+  const [tryOnMode, setTryOnMode] = useState<{ isAi: boolean; provider?: string }>({ isAi: false });
   const [recommendation, setRecommendation] = useState<OutfitRecommendation | null>(null);
   const [activeItems, setActiveItems] = useState<WardrobeItem[]>([]);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -148,17 +149,19 @@ export const HomePage: React.FC = () => {
   // Helper to re-render Virtual Try-On canvas with current items
   const renderCanvasWithItems = async (items: WardrobeItem[]) => {
     try {
-      const renderedUrl = await generateVirtualTryOn({
+      const result = await generateVirtualTryOn({
         child: safeChild,
         items,
         occasionLabel: currentOccasionLabels.label,
         weather: currentWeather,
         locale,
       });
-      setTryOnImageUrl(renderedUrl);
+      setTryOnImageUrl(result.imageUrl);
+      setTryOnMode({ isAi: result.isAiGenerated, provider: result.providerName });
     } catch (e) {
       console.warn('Canvas rendering error:', e);
       setTryOnImageUrl(safeChild.fullBodyPhotoUrl);
+      setTryOnMode({ isAi: false });
     }
   };
 
@@ -384,9 +387,21 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          <span className="text-[11px] font-bold text-[#7A56AE] bg-[#F4EFFA] border border-[#EAE2F3] px-2.5 py-0.5 rounded-full">
-            {activeItems.length} {t('piecesFitted')}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border transition-all flex items-center gap-1 shadow-2xs"
+              style={{
+                backgroundColor: tryOnMode.isAi ? '#F4EFFA' : '#FAF8FC',
+                color: tryOnMode.isAi ? '#7A56AE' : '#5A4F6B',
+                borderColor: '#EAE2F3',
+              }}
+            >
+              <Sparkles className="w-3 h-3 text-[#8B68BD]" />
+              {tryOnMode.isAi ? 'Gemini AI Vision' : 'HD Smart Fitting'}
+            </span>
+            <span className="text-[11px] font-bold text-[#7A56AE] bg-[#F4EFFA] border border-[#EAE2F3] px-2.5 py-0.5 rounded-full">
+              {activeItems.length} {t('piecesFitted')}
+            </span>
+          </div>
         </div>
 
         {/* Canvas Display */}
