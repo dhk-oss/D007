@@ -115,8 +115,9 @@ const kidAvatarSvgString = `
 /**
  * Strips solid white, light grey, or high-luminance studio background from garment photos
  * via canvas pixel analysis, returning an offscreen canvas with a transparent, soft-edged cutout.
+ * When isOpenOuterwear is true, creates a soft center-front opening so the inner top remains visible.
  */
-function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
+function createGarmentCutout(sourceImg: HTMLImageElement, isOpenOuterwear = false): HTMLCanvasElement {
   const gCanvas = document.createElement('canvas');
   const w = sourceImg.naturalWidth || sourceImg.width;
   const h = sourceImg.naturalHeight || sourceImg.height;
@@ -182,6 +183,40 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
 
       gCtx.putImageData(imgData, 0, 0);
     }
+
+    // If this is outerwear over an inner top, apply a soft unbuttoned/open center-front vertical split
+    if (isOpenOuterwear) {
+      const centerX = gCanvas.width / 2;
+      const halfOpeningWidth = gCanvas.width * 0.16; // 32% center opening
+      const topY = gCanvas.height * 0.12;
+      const bottomY = gCanvas.height * 0.95;
+
+      const splitData = gCtx.getImageData(0, 0, gCanvas.width, gCanvas.height);
+      const sData = splitData.data;
+
+      for (let y = Math.floor(topY); y < Math.floor(bottomY); y++) {
+        // Subtle natural tapering: slightly wider at hem than collar
+        const progress = (y - topY) / (bottomY - topY);
+        const currentOpening = halfOpeningWidth * (0.85 + 0.35 * progress);
+
+        for (let x = Math.floor(centerX - currentOpening); x <= Math.ceil(centerX + currentOpening); x++) {
+          if (x < 0 || x >= gCanvas.width) continue;
+          const idx = (y * gCanvas.width + x) * 4;
+          const distFromCenter = Math.abs(x - centerX);
+
+          if (distFromCenter < currentOpening * 0.70) {
+            // Full opening
+            sData[idx + 3] = 0;
+          } else {
+            // Feathered soft edge along the open coat lapels
+            const edgeFactor = (distFromCenter - currentOpening * 0.70) / (currentOpening * 0.30);
+            sData[idx + 3] = Math.round(sData[idx + 3] * Math.min(1, Math.max(0, edgeFactor)));
+          }
+        }
+      }
+
+      gCtx.putImageData(splitData, 0, 0);
+    }
   } catch (e) {
     console.warn('Could not key out background for garment image:', e);
   }
@@ -232,9 +267,11 @@ Styling Task:
 Render the child model realistically dressed in the selected wardrobe ensemble.
 Strict requirements:
 1. FACIAL INTEGRITY: Keep the exact face, eyes, hair, head, and joyful expression of the child in the first photo unaltered.
-2. NATURAL WEARING: Seamlessly replace or layer over the original dress. Outerwear wraps around shoulders and arms. Top tucks or drapes naturally. Pants/skirt fall to legs. Shoes match feet grounding.
-3. CLEAR SIGHTLINE: Hats or accessories must sit naturally atop hair without obscuring the child's eyes or forehead.
-4. STUDIO FINISH: Clean studio background, premium catalog quality.`;
+2. DETERMINISTIC WEARING ORDER: Layer garments in the exact physical sequence: tops (or onepiece) -> bottoms -> shoes -> outerwear -> accessories.
+3. OPEN OUTERWEAR TO REVEAL INNER TOP: If outerwear (jacket/cardigan/coat) is worn, it MUST appear open in the center-front (unzipped/unbuttoned) so the inner top or onepiece worn underneath is clearly visible and layered naturally beneath it.
+4. NATURAL WEARING: Outerwear wraps comfortably over shoulders and arms. Fabrics must fold, drape, and cast natural shadows over underlying layers.
+5. CLEAR SIGHTLINE: Hats or hair accessories must sit naturally atop hair without obscuring the child's eyes or forehead.
+6. STUDIO FINISH: Clean studio background, premium catalog quality.`;
 
     const requestBody = {
       contents: [
@@ -366,19 +403,20 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
     }
 
     // 2. Realistic Garment Compositing onto Child Photo/Avatar:
-    // Seamlessly fit selected outfit items onto anatomical anchors:
-    // - Hats/accessories sit above hairline, NEVER over eyes or nose.
-    // - Tops/Outerwear cover chest/torso with soft contours.
-    // - Bottoms drape from waist down.
-    // - Shoes ground at feet base.
+    // Strictly enforced deterministic fitting order:
+    // Standard sequence: tops -> bottoms -> shoes -> outerwear -> accessories
+    // When onepiece is present: onepiece (replaces tops+bottoms) -> shoes -> outerwear -> accessories
     if (items.length > 0) {
+      const hasOnepiece = items.some((i) => i.category === 'onepiece');
+      const hasInnerTop = items.some((i) => i.category === 'tops' || i.category === 'onepiece');
+
       const layerPriority: Record<string, number> = {
-        bottoms: 1,
-        tops: 2,
-        onepiece: 3,
-        outerwear: 4,
-        shoes: 5,
-        accessories: 6,
+        tops: hasOnepiece ? 10 : 1, // tops rendered first (or skipped if onepiece)
+        onepiece: 1,                 // onepiece serves as combined top+bottom step
+        bottoms: hasOnepiece ? 10 : 2, // bottoms follow tops
+        shoes: 3,                   // shoes ground the feet
+        outerwear: 4,               // outerwear layered over tops/bottoms/shoes
+        accessories: 5,             // hats/accessories finish top of head
       };
 
       const sortedItems = [...items].sort((a, b) => {
@@ -390,8 +428,10 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         const rawImg = await loadImage(item.imageUrl);
         if (rawImg.width === 0 || rawImg.height === 0) continue;
 
-        // Key out solid studio backdrops to get transparent garment shape
-        const gCutout = createGarmentCutout(rawImg);
+        // If this item is outerwear and an inner top/onepiece is present,
+        // render with an open front so the inner garment shows through naturally!
+        const isOpenOuterwear = item.category === 'outerwear' && hasInnerTop;
+        const gCutout = createGarmentCutout(rawImg, isOpenOuterwear);
 
         ctx.save();
         ctx.shadowColor = 'rgba(35, 27, 46, 0.24)';
@@ -421,26 +461,27 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = childBounds.y + childBounds.h * 0.28;
-        } else if (item.category === 'outerwear') {
-          gw = childBounds.w * 0.56;
-          gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.25;
-        } else if (item.category === 'bottoms') {
-          gw = childBounds.w * 0.44;
-          gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.48;
         } else if (item.category === 'onepiece') {
           gw = childBounds.w * 0.52;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = childBounds.y + childBounds.h * 0.28;
+        } else if (item.category === 'bottoms') {
+          gw = childBounds.w * 0.44;
+          gh = gw * aspect;
+          gx = childBounds.x + (childBounds.w - gw) / 2;
+          gy = childBounds.y + childBounds.h * 0.48;
         } else if (item.category === 'shoes') {
           gw = childBounds.w * 0.36;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = childBounds.y + childBounds.h * 0.84;
+        } else if (item.category === 'outerwear') {
+          // Outerwear wraps around shoulders slightly wider to comfortably layer over top
+          gw = childBounds.w * 0.58;
+          gh = gw * aspect;
+          gx = childBounds.x + (childBounds.w - gw) / 2;
+          gy = childBounds.y + childBounds.h * 0.25;
         }
 
         if (gw > 0 && gh > 0) {
