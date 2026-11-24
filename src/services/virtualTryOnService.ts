@@ -256,7 +256,18 @@ async function trySynthesizeWithGoogleCloudVTO(
     (typeof window !== 'undefined' &&
       (window as unknown as { __GCLOUD_VTO_ENDPOINT__?: string }).__GCLOUD_VTO_ENDPOINT__);
 
-  if (!endpoint || !params.child.fullBodyPhotoUrl || !params.items.length) {
+  if (!endpoint) {
+    console.info('[TryOn Diagnostic] Google Cloud VTO endpoint not configured (VITE_GCLOUD_VTO_ENDPOINT missing). Falling back to Gemini / Smart Fitting.');
+    return null;
+  }
+
+  if (!params.child.fullBodyPhotoUrl) {
+    console.info('[TryOn Diagnostic] Google Cloud VTO skipped: No child full-body photo available.');
+    return null;
+  }
+
+  if (!params.items.length) {
+    console.info('[TryOn Diagnostic] Google Cloud VTO skipped: No garments selected.');
     return null;
   }
 
@@ -281,7 +292,10 @@ async function trySynthesizeWithGoogleCloudVTO(
 
     // Prepare initial base person payload
     const personPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
-    if (!personPayload) return null;
+    if (!personPayload) {
+      console.warn('[TryOn Diagnostic] Google Cloud VTO: Failed to serialize child photo to base64.');
+      return null;
+    }
 
     let currentPersonImage = `data:${personPayload.mimeType};base64,${personPayload.data}`;
 
@@ -338,6 +352,7 @@ async function trySynthesizeWithGoogleCloudVTO(
     }
 
     if (currentPersonImage !== `data:${personPayload.mimeType};base64,${personPayload.data}`) {
+      console.info('[TryOn Diagnostic] Google Cloud VTO synthesis succeeded.');
       return {
         imageUrl: currentPersonImage,
         providerName: 'Google Cloud VTO',
@@ -346,7 +361,7 @@ async function trySynthesizeWithGoogleCloudVTO(
 
     return null;
   } catch (err) {
-    console.warn('Google Cloud VTO execution failed/fallback:', err);
+    console.warn('[TryOn Diagnostic] Google Cloud VTO execution failed/fallback:', err);
     return null;
   }
 }
@@ -360,13 +375,25 @@ async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<{ im
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) ||
     (typeof window !== 'undefined' && (window as unknown as { __GEMINI_API_KEY__?: string }).__GEMINI_API_KEY__);
 
-  if (!apiKey || !params.child.fullBodyPhotoUrl || !params.items.length) {
+  if (!apiKey) {
+    console.info('[TryOn Diagnostic] Gemini AI synthesis skipped (VITE_GEMINI_API_KEY not configured). Using HD Smart Fitting fallback.');
+    return null;
+  }
+
+  if (!params.child.fullBodyPhotoUrl) {
+    console.info('[TryOn Diagnostic] Gemini AI synthesis skipped: No child full-body photo available.');
+    return null;
+  }
+
+  if (!params.items.length) {
+    console.info('[TryOn Diagnostic] Gemini AI synthesis skipped: No items selected.');
     return null;
   }
 
   // 1. Prepare child photo payload
   const childPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
   if (!childPayload) {
+    console.warn('[TryOn Diagnostic] Gemini AI: Failed to encode child photo to base64.');
     return null;
   }
 
@@ -553,11 +580,14 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       }
     }
 
-    // 2. Realistic Garment Compositing onto Child Photo/Avatar:
-    // Strictly enforced deterministic fitting order:
-    // Standard sequence: tops -> bottoms -> shoes -> outerwear -> accessories
-    // When onepiece is present: onepiece (replaces tops+bottoms) -> shoes -> outerwear -> accessories
-    if (items.length > 0) {
+    // 2. HD Smart Fitting Studio Presentation:
+    // To maintain a high-end, clean studio catalog aesthetic:
+    // When a custom photo of the child is used, we NEVER paste awkward cutout stickers over the child's body or face.
+    // The child's natural photo is preserved 100% clean, unobstructed, and centered in studio lighting.
+    // The selected outfit is displayed in the bottom showcase rail in deterministic order:
+    // tops/onepiece -> bottoms -> shoes -> outerwear (with open-front tag) -> accessories.
+    // If the avatar illustration is used, garments are contoured softly onto the silhouette.
+    if (items.length > 0 && !hasCustomPhoto) {
       const hasOnepiece = items.some((i) => i.category === 'onepiece');
       const hasInnerTop = items.some((i) => i.category === 'tops' || i.category === 'onepiece');
 
@@ -596,43 +626,37 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
 
         const aspect = gCutout.height / gCutout.width;
 
-        // Precise anatomical anchors relative to child proportions
-        // Head / Hat anchor: Y = top 0%..12%
-        // Torso / Tops: Y = 28%..54%
-        // Waist / Bottoms: Y = 48%..78%
-        // Feet / Shoes: Y = 84%..96%
         if (item.category === 'accessories') {
           // Hats and hair accessories sit strictly above the eye/brow line
-          gw = childBounds.w * 0.30;
+          gw = childBounds.w * 0.28;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = childBounds.y + childBounds.h * 0.01;
         } else if (item.category === 'tops') {
+          gw = childBounds.w * 0.48;
+          gh = gw * aspect;
+          gx = childBounds.x + (childBounds.w - gw) / 2;
+          gy = childBounds.y + childBounds.h * 0.30;
+        } else if (item.category === 'onepiece') {
           gw = childBounds.w * 0.50;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.28;
-        } else if (item.category === 'onepiece') {
-          gw = childBounds.w * 0.52;
-          gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.28;
+          gy = childBounds.y + childBounds.h * 0.30;
         } else if (item.category === 'bottoms') {
-          gw = childBounds.w * 0.44;
+          gw = childBounds.w * 0.42;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.48;
+          gy = childBounds.y + childBounds.h * 0.50;
         } else if (item.category === 'shoes') {
-          gw = childBounds.w * 0.36;
+          gw = childBounds.w * 0.34;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
           gy = childBounds.y + childBounds.h * 0.84;
         } else if (item.category === 'outerwear') {
-          // Outerwear wraps around shoulders slightly wider to comfortably layer over top
-          gw = childBounds.w * 0.58;
+          gw = childBounds.w * 0.54;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.25;
+          gy = childBounds.y + childBounds.h * 0.26;
         }
 
         if (gw > 0 && gh > 0) {
