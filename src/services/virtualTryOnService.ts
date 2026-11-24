@@ -538,29 +538,27 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
     const stageY = 96;
     const stageHeight = 644;
 
-    let childBounds = { x: 0, y: stageY, w: width, h: stageHeight };
-
     // 1. Draw Child Avatar or Custom Full-Body Photo in dedicated stage
     if (hasCustomPhoto) {
       const childImg = await loadImage(child.fullBodyPhotoUrl);
       if (childImg.width > 0) {
-        const scale = Math.min((width * 0.94) / childImg.width, (stageHeight * 0.98) / childImg.height);
+        // Position child model on left half (X: 18..350)
+        const leftStageW = items.length > 0 ? width * 0.54 : width * 0.94;
+        const scale = Math.min(leftStageW / childImg.width, (stageHeight * 0.96) / childImg.height);
         const dw = childImg.width * scale;
         const dh = childImg.height * scale;
-        const dx = (width - dw) / 2;
+        const dx = items.length > 0 ? 20 + (leftStageW - dw) / 2 : (width - dw) / 2;
         const dy = stageY + (stageHeight - dh) / 2;
-
-        childBounds = { x: dx, y: dy, w: dw, h: dh };
 
         // Subtle soft studio floor shadow
         ctx.save();
         ctx.fillStyle = 'rgba(139, 104, 189, 0.15)';
         ctx.beginPath();
-        ctx.ellipse(width / 2, dy + dh - 6, dw * 0.35, 12, 0, 0, Math.PI * 2);
+        ctx.ellipse(dx + dw / 2, dy + dh - 6, dw * 0.35, 12, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
-        // Render child portrait cleanly
+        // Render child portrait cleanly without ANY overlapping stickers
         ctx.drawImage(childImg, dx, dy, dw, dh);
       }
     } else {
@@ -568,26 +566,50 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(kidAvatarSvgString);
       const avatarImg = await loadImage(svgDataUrl);
       if (avatarImg.width > 0) {
-        const scale = Math.min((width * 0.88) / avatarImg.width, (stageHeight * 0.94) / avatarImg.height);
+        const leftStageW = items.length > 0 ? width * 0.54 : width * 0.88;
+        const scale = Math.min(leftStageW / avatarImg.width, (stageHeight * 0.94) / avatarImg.height);
         const dw = avatarImg.width * scale;
         const dh = avatarImg.height * scale;
-        const dx = (width - dw) / 2;
+        const dx = items.length > 0 ? 20 + (leftStageW - dw) / 2 : (width - dw) / 2;
         const dy = stageY + (stageHeight - dh) / 2;
-
-        childBounds = { x: dx, y: dy, w: dw, h: dh };
 
         ctx.drawImage(avatarImg, dx, dy, dw, dh);
       }
     }
 
-    // 2. HD Smart Fitting Studio Presentation:
-    // To maintain a high-end, clean studio catalog aesthetic:
-    // When a custom photo of the child is used, we NEVER paste awkward cutout stickers over the child's body or face.
-    // The child's natural photo is preserved 100% clean, unobstructed, and centered in studio lighting.
-    // The selected outfit is displayed in the bottom showcase rail in deterministic order:
-    // tops/onepiece -> bottoms -> shoes -> outerwear (with open-front tag) -> accessories.
-    // If the avatar illustration is used, garments are contoured softly onto the silhouette.
-    if (items.length > 0 && !hasCustomPhoto) {
+    // 2. HD Smart Fitting Studio Outfit Ensemble Stage:
+    // When items are selected, render the complete outfit ensemble in a dedicated studio mannequin display
+    // on the right side of the canvas (X: 360..620).
+    // This shows the garments in the exact deterministic order:
+    // tops/onepiece -> bottoms -> shoes -> outerwear (open-front) -> accessories
+    // WITHOUT obscuring or pasting stickers over the child model's face or body!
+    if (items.length > 0) {
+      const outfitStageX = width * 0.56;
+      const outfitStageW = width * 0.40;
+      const outfitStageY = stageY + 10;
+      const outfitStageH = stageHeight - 20;
+
+      // Studio styling card backdrop
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.shadowColor = 'rgba(139, 104, 189, 0.12)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
+      this.roundRect(ctx, outfitStageX - 10, outfitStageY, outfitStageW + 18, outfitStageH, 22);
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#EAE2F3';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Card Header Tag
+      ctx.fillStyle = '#8B68BD';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✨ FITTED ENSEMBLE', outfitStageX + outfitStageW / 2, outfitStageY + 22);
+      ctx.restore();
+
       const hasOnepiece = items.some((i) => i.category === 'onepiece');
       const hasInnerTop = items.some((i) => i.category === 'tops' || i.category === 'onepiece');
 
@@ -597,7 +619,7 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         bottoms: hasOnepiece ? 10 : 2, // bottoms follow tops
         shoes: 3,                   // shoes ground the feet
         outerwear: 4,               // outerwear layered over tops/bottoms/shoes
-        accessories: 5,             // hats/accessories finish top of head
+        accessories: 5,             // hats/accessories finish top
       };
 
       const sortedItems = [...items].sort((a, b) => {
@@ -609,13 +631,11 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         const rawImg = await loadImage(item.imageUrl);
         if (rawImg.width === 0 || rawImg.height === 0) continue;
 
-        // If this item is outerwear and an inner top/onepiece is present,
-        // render with an open front so the inner garment shows through naturally!
         const isOpenOuterwear = item.category === 'outerwear' && hasInnerTop;
         const gCutout = createGarmentCutout(rawImg, isOpenOuterwear);
 
         ctx.save();
-        ctx.shadowColor = 'rgba(35, 27, 46, 0.24)';
+        ctx.shadowColor = 'rgba(35, 27, 46, 0.20)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 4;
 
@@ -626,37 +646,42 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
 
         const aspect = gCutout.height / gCutout.width;
 
+        // Position items proportionally inside the ensemble mannequin stage:
+        // Accessories (hat/hairband): Y = 36..110
+        // Tops / Onepiece: Y = 115..280
+        // Outerwear: Y = 105..285 (open front reveals top)
+        // Bottoms: Y = 285..450
+        // Shoes: Y = 460..580
         if (item.category === 'accessories') {
-          // Hats and hair accessories sit strictly above the eye/brow line
-          gw = childBounds.w * 0.28;
+          gw = outfitStageW * 0.52;
           gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.01;
+          gx = outfitStageX + (outfitStageW - gw) / 2;
+          gy = outfitStageY + 36;
         } else if (item.category === 'tops') {
-          gw = childBounds.w * 0.48;
+          gw = outfitStageW * 0.78;
           gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.30;
+          gx = outfitStageX + (outfitStageW - gw) / 2;
+          gy = outfitStageY + 115;
         } else if (item.category === 'onepiece') {
-          gw = childBounds.w * 0.50;
+          gw = outfitStageW * 0.82;
           gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.30;
+          gx = outfitStageX + (outfitStageW - gw) / 2;
+          gy = outfitStageY + 115;
         } else if (item.category === 'bottoms') {
-          gw = childBounds.w * 0.42;
+          gw = outfitStageW * 0.72;
           gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.50;
+          gx = outfitStageX + (outfitStageW - gw) / 2;
+          gy = outfitStageY + (hasInnerTop ? 285 : 210);
         } else if (item.category === 'shoes') {
-          gw = childBounds.w * 0.34;
+          gw = outfitStageW * 0.58;
           gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.84;
+          gx = outfitStageX + (outfitStageW - gw) / 2;
+          gy = outfitStageY + outfitStageH - 85;
         } else if (item.category === 'outerwear') {
-          gw = childBounds.w * 0.54;
+          gw = outfitStageW * 0.88;
           gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.26;
+          gx = outfitStageX + (outfitStageW - gw) / 2;
+          gy = outfitStageY + 105;
         }
 
         if (gw > 0 && gh > 0) {
