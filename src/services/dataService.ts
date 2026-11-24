@@ -1,13 +1,13 @@
 import { ChildProfile, WardrobeItem, StylingLookbook, ParentUser, LocationInfo, BodyProportionAnalysis } from '../types';
-import { initialChildren, initialWardrobe, initialLookbooks, mockParentUser } from '../utils/mockData';
+import { initialChildren, mockParentUser } from '../utils/mockData';
 import { isMockMode, storage, auth } from './firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { DEFAULT_LOCATION } from './weatherService';
 
 const STORAGE_KEYS = {
   CHILDREN: 'kids_ai_children_v2',
-  WARDROBE: 'kids_ai_wardrobe_v2',
-  LOOKBOOKS: 'kids_ai_lookbooks_v2',
+  WARDROBE: 'kids_ai_wardrobe_v3',
+  LOOKBOOKS: 'kids_ai_lookbooks_v3',
   ACTIVE_CHILD: 'kids_ai_active_child_v2',
   PARENT_USER: 'kids_ai_parent_user_v2',
   LOCATION: 'kids_ai_location_v2',
@@ -17,11 +17,73 @@ const STORAGE_KEYS = {
 const LEGACY_KEYS = [
   'kids_ai_children_v1',
   'kids_ai_wardrobe_v1',
+  'kids_ai_wardrobe_v2',
   'kids_ai_lookbooks_v1',
+  'kids_ai_lookbooks_v2',
   'kids_ai_active_child_v1',
   'kids_ai_parent_user_v1',
   'kids_ai_location_v1',
 ];
+
+/**
+ * Detects whether an item is one of the initial seed/sample items
+ */
+export function isSampleWardrobeItem(item: Partial<WardrobeItem>): boolean {
+  if (!item) return false;
+
+  const sampleIds = new Set([
+    'kids-item-1', 'kids-item-2', 'kids-item-3', 'kids-item-4', 'kids-item-5', 'kids-item-6',
+    'kids-item-7', 'kids-item-8', 'kids-item-9', 'kids-item-10', 'kids-item-11', 'kids-item-12',
+    'item-1', 'item-2', 'item-3', 'item-4', 'item-5', 'item-6', 'item-7', 'item-8', 'item-9', 'item-10',
+  ]);
+
+  if (item.id && (sampleIds.has(item.id) || item.id.startsWith('kids-item-'))) {
+    return true;
+  }
+
+  const sampleNames = new Set([
+    'Pastel Bear Knit Cardigan',
+    'Rainbow Stripe Kids Cotton Tee',
+    'Soft Corduroy Kids Overalls',
+    'Comfy Kids Cotton Jogger Pants',
+    'Kids Hooded Windbreaker Jacket',
+    'Cozy Teddy Fleece Kids Vest',
+    'Daisy Smocked Kids Sundress',
+    'Kids Velcro Cloud Sneakers',
+    'Kids Sun-Shield Cotton Bucket Hat',
+    'Soft Peach Trench Coat',
+    'Floral Prairie Dress',
+    'Denim Flared Trousers',
+    'Denim Flared Jeans',
+    'Canvas Sneaker Lows',
+    'Sunflower Straw Bucket Hat',
+    'Cream Knit Sweater',
+    'Striped Long-sleeve Tee',
+    'Khaki Cargo Joggers',
+    'Teddy Bear Fleece Vest',
+    'Velcro Easy Runners',
+    '파스텔 곰돌이 니트 가디건',
+    '무지개 스트라이프 키즈 면 티셔츠',
+    '소프트 코듀로이 키즈 멜빵바지',
+    '편안한 키즈 코튼 조거팬츠',
+    '키즈 후드 바람막이 점퍼',
+    '포근한 테디 플리스 키즈 조끼',
+    '데이지 스모킹 키즈 원피스',
+    '키즈 벨크로 클라우드 운동화',
+    '키즈 자외선차단 코튼 버킷햇',
+  ]);
+
+  if (item.name && sampleNames.has(item.name.trim())) {
+    return true;
+  }
+
+  if (item.imageUrl) {
+    if (item.imageUrl.includes('unsplash.com')) return true;
+    if (item.imageUrl.includes('KIDS 3-11') || item.imageUrl.includes('KIDS%203-11')) return true;
+  }
+
+  return false;
+}
 
 /**
  * Offscreen HTML5 Canvas Image Compressor
@@ -257,67 +319,65 @@ export const DataService = {
   },
 
   /**
-   * Wardrobe Items CRUD
+   * Wardrobe Items CRUD (Only User-Added Items)
    */
   getWardrobe(): WardrobeItem[] {
-    const raw = getItem<WardrobeItem[]>(STORAGE_KEYS.WARDROBE, initialWardrobe);
+    let raw = getItem<WardrobeItem[]>(STORAGE_KEYS.WARDROBE, []);
     if (!Array.isArray(raw) || raw.length === 0) {
-      this.saveWardrobe(initialWardrobe);
-      return initialWardrobe;
+      const v2 = getItem<WardrobeItem[]>('kids_ai_wardrobe_v2', []);
+      if (Array.isArray(v2) && v2.length > 0) {
+        raw = v2;
+      }
     }
 
-    // Auto-migrate legacy adult sample items or unsplash photos
-    const legacyNames = [
-      'Soft Peach Trench Coat',
-      'Floral Prairie Dress',
-      'Denim Flared Trousers',
-      'Denim Flared Jeans',
-      'Canvas Sneaker Lows',
-      'Sunflower Straw Bucket Hat',
-      'Cream Knit Sweater',
-      'Striped Long-sleeve Tee',
-      'Khaki Cargo Joggers',
-      'Teddy Bear Fleece Vest',
-      'Velcro Easy Runners',
-    ];
-
-    const hasLegacyAdultItems = raw.some(
-      (item) =>
-        Boolean(item.name && legacyNames.includes(item.name)) ||
-        Boolean(item.imageUrl && item.imageUrl.includes('unsplash.com')) ||
-        Boolean(item.id && item.id.startsWith('item-'))
-    );
-
-    if (hasLegacyAdultItems) {
-      // Filter out user-created custom items (custom items have timestamp IDs like item-17...)
-      const customItems = raw.filter(
-        (item) =>
-          !legacyNames.includes(item.name || '') &&
-          !item.imageUrl?.includes('unsplash.com') &&
-          !['item-1', 'item-2', 'item-3', 'item-4', 'item-5', 'item-6', 'item-7', 'item-8', 'item-9', 'item-10'].includes(item.id || '')
-      );
-      const migrated = [...initialWardrobe, ...customItems];
-      this.saveWardrobe(migrated);
-      return migrated;
+    if (!Array.isArray(raw)) {
+      this.saveWardrobe([]);
+      return [];
     }
 
-    return raw;
+    // Filter out all sample seed items, retaining only actual user-added garments
+    const userOnlyItems = raw.filter((item) => !isSampleWardrobeItem(item));
+
+    this.saveWardrobe(userOnlyItems);
+    try {
+      localStorage.removeItem('kids_ai_wardrobe_v2');
+      localStorage.removeItem('kids_ai_wardrobe_v1');
+    } catch {}
+
+    return userOnlyItems;
   },
 
   saveWardrobe(items: WardrobeItem[]): void {
-    setItem(STORAGE_KEYS.WARDROBE, items);
+    const userOnlyItems = (items || []).filter((item) => !isSampleWardrobeItem(item));
+    setItem(STORAGE_KEYS.WARDROBE, userOnlyItems);
   },
 
   /**
-   * Styling Lookbooks CRUD
+   * Styling Lookbooks CRUD (Only User-Saved Looks)
    */
   getLookbooks(): StylingLookbook[] {
-    const raw = getItem<StylingLookbook[]>(STORAGE_KEYS.LOOKBOOKS, initialLookbooks);
-    if (!Array.isArray(raw)) {
-      this.saveLookbooks(initialLookbooks);
-      return initialLookbooks;
+    let raw = getItem<StylingLookbook[]>(STORAGE_KEYS.LOOKBOOKS, []);
+    if (!Array.isArray(raw) || raw.length === 0) {
+      const v2 = getItem<StylingLookbook[]>('kids_ai_lookbooks_v2', []);
+      if (Array.isArray(v2) && v2.length > 0) {
+        raw = v2;
+      }
     }
-    return raw;
+
+    if (!Array.isArray(raw)) {
+      this.saveLookbooks([]);
+      return [];
+    }
+
+    // Filter out seed lookbooks ('look-1', 'look-2')
+    const userOnlyLooks = raw.filter((look) => look && look.id !== 'look-1' && look.id !== 'look-2');
+    this.saveLookbooks(userOnlyLooks);
+    try {
+      localStorage.removeItem('kids_ai_lookbooks_v2');
+      localStorage.removeItem('kids_ai_lookbooks_v1');
+    } catch {}
+
+    return userOnlyLooks;
   },
 
   saveLookbooks(lookbooks: StylingLookbook[]): void {

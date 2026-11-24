@@ -508,12 +508,14 @@ export const HomePage: React.FC = () => {
           <div className="p-3.5 rounded-2xl bg-pastel-coral-light/70 border border-pastel-coral/30 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-pastel-coral">
-                {t('fitScore')}: {recommendation.weatherMatchScore ?? 95}% ({t('optimalHarmony')})
+                {recommendation.selectedItems && recommendation.selectedItems.length > 0
+                  ? `${t('fitScore')}: ${recommendation.weatherMatchScore ?? 95}% (${t('optimalHarmony')})`
+                  : ''}
               </span>
               <button
                 onClick={handleSaveToLookbook}
-                disabled={savedSuccess}
-                className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-pastel-coral text-white shadow-soft hover:bg-rose-500 transition active:scale-95 disabled:bg-emerald-600"
+                disabled={savedSuccess || activeItems.length === 0}
+                className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-pastel-coral text-white shadow-soft hover:bg-rose-500 transition active:scale-95 disabled:bg-stone-300 disabled:opacity-60"
               >
                 <Bookmark className="w-3.5 h-3.5" />
                 <span>{savedSuccess ? t('savedToLookbook') : t('saveToLookbook')}</span>

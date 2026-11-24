@@ -388,6 +388,18 @@ function getLocalizedStylingRationale(params: {
   const { childName, occasionName, itemsList, temp, weatherCondition, silhouetteDesc, lang } = params;
   const firstName = childName.split(' ')[0];
 
+  if (!itemsList || itemsList.trim() === '') {
+    if (lang === 'ko') return '아직 등록된 옷이 없습니다. 옷장 탭에서 아이의 예쁜 옷을 등록해보세요!';
+    if (lang === 'ja') return '登録されている洋服がまだありません。クローゼットタブでお気に入りの服を登録してみましょう！';
+    if (lang === 'zh') return '暂无已登记的衣物。请前往衣橱页面添加宝贝的漂亮衣服吧！';
+    if (lang === 'mn') return 'Одоогоор бүртгэгдсэн хувцас алга байна. Шүүгээ хэсэгт очиж хүүхдийнхээ хувцсыг нэмээрэй!';
+    if (lang === 'es') return 'Aún no hay prendas registradas. ¡Añade la ropa favorita de tu peque en el Armario!';
+    if (lang === 'ru') return 'Пока нет зарегистрированных вещей. Добавьте одежду ребенка во вкладке Гардероб!';
+    if (lang === 'pt') return 'Ainda não há roupas cadastradas. Adicione as peças favoritas no Guarda-roupa!';
+    if (lang === 'fr') return 'Aucun vêtement enregistré. Ajoutez les tenues de votre enfant dans la Garde-robe !';
+    return "No clothes registered yet. Add your child's favorite outfits in the Wardrobe tab!";
+  }
+
   if (lang === 'ko') {
     return `${occasionName} 일정과 ${temp}°C (${weatherCondition}) 날씨에 맞춰 ${itemsList || '선택한 아이템'}으로 조화롭게 스타일링했습니다. ${firstName} 아이의 ${silhouetteDesc} 체형 비율을 돋보이게 연출합니다.`;
   }
@@ -523,7 +535,7 @@ export function recommendOutfitFromWardrobe(params: {
   });
 
   // Match score calculation
-  const weatherMatchScore = Math.min(99, 85 + selectedItems.length * 3);
+  const weatherMatchScore = selectedItems.length > 0 ? Math.min(99, 85 + selectedItems.length * 3) : 0;
 
   return {
     selectedItems,
