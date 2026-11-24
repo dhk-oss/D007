@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Camera, RefreshCw, X, Check, Upload, FlipHorizontal, AlertCircle } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 import { compressImageToDataUrl } from '../services/dataService';
+import { getLocalizedChildName } from '../utils/localeHelpers';
 
 interface GuidedCameraModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ export const GuidedCameraModal: React.FC<GuidedCameraModalProps> = ({
   onCapture,
   childName,
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -141,7 +142,7 @@ export const GuidedCameraModal: React.FC<GuidedCameraModalProps> = ({
             {t('cameraGuideTitle')}
           </h3>
           <p className="text-[11px] text-stone-300">
-            {childName ? `${childName}: ${t('alignInsideGuide')}` : t('alignInsideGuide')}
+            {childName ? `${getLocalizedChildName(childName, locale)}: ${t('alignInsideGuide')}` : t('alignInsideGuide')}
           </p>
         </div>
         <button

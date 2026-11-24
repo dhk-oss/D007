@@ -1,26 +1,63 @@
 import { LocationInfo } from '../types';
 
 /**
+ * Check if the child name is one of the initial seed/default names
+ */
+export function isDefaultChildName(name: string = ''): boolean {
+  if (!name) return false;
+  const trimmed = name.trim();
+  const firstName = trimmed.split(' ')[0].trim();
+  return (
+    trimmed === 'Ha-eun (Chloe)' ||
+    trimmed === 'Min-woo (Leo)' ||
+    trimmed === 'Ha-eun' ||
+    trimmed === 'Min-woo' ||
+    trimmed === 'Chloe' ||
+    trimmed === 'Leo' ||
+    trimmed === '하은' ||
+    trimmed === '민우' ||
+    trimmed === 'ハウン' ||
+    trimmed === 'ミヌ' ||
+    trimmed === '夏恩' ||
+    trimmed === '民宇' ||
+    firstName === 'Ha-eun' ||
+    firstName === 'Min-woo'
+  );
+}
+
+/**
  * Localizes child names (maps default seed names, preserves user custom names)
  */
 export function getLocalizedChildName(name: string = '', locale: string = 'ko'): string {
   if (!name) return '';
-  const firstName = name.split(' ')[0].trim();
+  const trimmed = name.trim();
 
   // Mapping for default names
   const nameMap: Record<string, Record<string, string>> = {
-    'Ha-eun': { ko: '하은', en: 'Ha-eun', ja: 'ハウン', zh: '夏恩' },
-    'Chloe': { ko: '하은', en: 'Chloe', ja: 'ハウン', zh: '夏恩' },
-    'Min-woo': { ko: '민우', en: 'Min-woo', ja: 'ミヌ', zh: '民宇' },
-    'Leo': { ko: '민우', en: 'Leo', ja: 'ミヌ', zh: '民宇' },
+    'Ha-eun (Chloe)': { ko: '하은', en: 'Ha-eun', ja: 'ハウン', zh: '夏恩', es: 'Ha-eun', ru: 'Ха-ын', mn: 'Ха-ын', pt: 'Ha-eun', fr: 'Ha-eun' },
+    'Min-woo (Leo)': { ko: '민우', en: 'Min-woo', ja: 'ミヌ', zh: '民宇', es: 'Min-woo', ru: 'Мин-у', mn: 'Мин-ү', pt: 'Min-woo', fr: 'Min-woo' },
+    'Ha-eun': { ko: '하은', en: 'Ha-eun', ja: 'ハウン', zh: '夏恩', es: 'Ha-eun', ru: 'Ха-ын', mn: 'Ха-ын', pt: 'Ha-eun', fr: 'Ha-eun' },
+    'Chloe': { ko: '하은', en: 'Chloe', ja: 'ハウン', zh: '夏恩', es: 'Chloe', ru: 'Хлоя', mn: 'Клое', pt: 'Chloe', fr: 'Chloé' },
+    'Min-woo': { ko: '민우', en: 'Min-woo', ja: 'ミヌ', zh: '民宇', es: 'Min-woo', ru: 'Мин-у', mn: 'Мин-ү', pt: 'Min-woo', fr: 'Min-woo' },
+    'Leo': { ko: '민우', en: 'Leo', ja: 'ミヌ', zh: '民宇', es: 'Leo', ru: 'Лео', mn: 'Лео', pt: 'Leo', fr: 'Léo' },
+    '하은': { ko: '하은', en: 'Ha-eun', ja: 'ハウン', zh: '夏恩', es: 'Ha-eun', ru: 'Ха-ын', mn: 'Ха-ын', pt: 'Ha-eun', fr: 'Ha-eun' },
+    '민우': { ko: '민우', en: 'Min-woo', ja: 'ミヌ', zh: '民宇', es: 'Min-woo', ru: 'Мин-у', mn: 'Мин-ү', pt: 'Min-woo', fr: 'Min-woo' },
+    'ハウン': { ko: '하은', en: 'Ha-eun', ja: 'ハウン', zh: '夏恩', es: 'Ha-eun', ru: 'Ха-ын', mn: 'Ха-ын', pt: 'Ha-eun', fr: 'Ha-eun' },
+    'ミヌ': { ko: '민우', en: 'Min-woo', ja: 'ミヌ', zh: '民宇', es: 'Min-woo', ru: 'Мин-у', mn: 'Мин-ү', pt: 'Min-woo', fr: 'Min-woo' },
+    '夏恩': { ko: '하은', en: 'Ha-eun', ja: 'ハウン', zh: '夏恩', es: 'Ha-eun', ru: 'Ха-ын', mn: 'Ха-ын', pt: 'Ha-eun', fr: 'Ha-eun' },
+    '民宇': { ko: '민우', en: 'Min-woo', ja: 'ミヌ', zh: '民宇', es: 'Min-woo', ru: 'Мин-у', mn: 'Мин-ү', pt: 'Min-woo', fr: 'Min-woo' },
   };
 
-  const found = nameMap[firstName] || nameMap[name];
-  if (found) {
-    return found[locale] || found['en'] || firstName;
+  if (nameMap[trimmed]) {
+    return nameMap[trimmed][locale] || nameMap[trimmed]['en'] || trimmed;
   }
 
-  return firstName;
+  const firstName = trimmed.split(' ')[0].trim();
+  if (nameMap[firstName]) {
+    return nameMap[firstName][locale] || nameMap[firstName]['en'] || firstName;
+  }
+
+  return trimmed;
 }
 
 /**

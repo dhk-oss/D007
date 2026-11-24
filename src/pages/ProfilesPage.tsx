@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Activity, CheckCircle2, Camera, Edit2, Sparkles, RefreshCw, Trash2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Plus, Activity, CheckCircle2, Camera, Edit2, Sparkles, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../context/LanguageContext';
 import { ChildProfile, GenderType, BodyProportionAnalysis } from '../types';
@@ -10,7 +10,8 @@ import {
   getLocalizedBodySummary,
   getLocalizedStylingNotes,
 } from '../services/bodyProportionService';
-import { getLocalizedChildName } from '../utils/localeHelpers';
+import { getLocalizedChildName, isDefaultChildName } from '../utils/localeHelpers';
+import { compressImageToDataUrl } from '../services/dataService';
 
 export const ProfilesPage: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ export const ProfilesPage: React.FC = () => {
   const [editingChild, setEditingChild] = useState<ChildProfile | null>(null);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form inputs
   const [name, setName] = useState('');
@@ -91,7 +93,10 @@ export const ProfilesPage: React.FC = () => {
 
   const handleOpenEditModal = (child: ChildProfile) => {
     setEditingChild(child);
-    setName(child.name);
+    const initialName = isDefaultChildName(child.name)
+      ? getLocalizedChildName(child.name, locale)
+      : child.name;
+    setName(initialName);
     setGender(child.gender);
     setAge(child.age);
     setHeightCm(child.heightCm);
@@ -100,6 +105,34 @@ export const ProfilesPage: React.FC = () => {
     setPhotoUrl(child.fullBodyPhotoUrl);
     setPreviewAnalysis(child.bodyProportionAnalysis);
     setIsModalOpen(true);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzing(true);
+    try {
+      const compressedDataUrl = await compressImageToDataUrl(file, 800, 800, 0.8);
+      setPhotoUrl(compressedDataUrl);
+
+      const analysis = await estimateBodyProportions({
+        imageDataUrlOrUrl: compressedDataUrl,
+        age: Number(age),
+        gender,
+        heightCm: Number(heightCm),
+        weightKg: Number(weightKg),
+        waistCm: Number(waistCm),
+      });
+      setPreviewAnalysis(analysis);
+    } catch (err) {
+      console.error('Failed to compress/analyze uploaded image:', err);
+    } finally {
+      setIsAnalyzing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleCameraCapture = async (dataUrl: string) => {
@@ -456,7 +489,7 @@ export const ProfilesPage: React.FC = () => {
                   {editingChild ? t('updateChildTitle') : t('registerChildTitle')}
                 </span>
                 <h3 className="font-extrabold text-base text-stone-800">
-                  {editingChild ? `${editingChild.name}` : t('addChildBtn')}
+                  {editingChild ? getLocalizedChildName(editingChild.name, locale) : t('addChildBtn')}
                 </h3>
               </div>
               <button
@@ -553,14 +586,31 @@ export const ProfilesPage: React.FC = () => {
                     )}
                   </div>
                   <div className="flex-1 space-y-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsCameraModalOpen(true)}
-                      className="w-full py-2 px-3 rounded-xl bg-pastel-coral text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs hover:bg-rose-500 transition"
-                    >
-                      <Camera className="w-3.5 h-3.5" />
-                      <span>{t('launchCameraBtn')}</span>
-                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsCameraModalOpen(true)}
+                        className="w-full py-2 px-2 rounded-xl bg-pastel-coral text-white text-[11px] font-bold flex items-center justify-center gap-1 shadow-xs hover:bg-rose-500 transition active:scale-98"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span className="truncate">{t('launchCameraBtn')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-2 px-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-bold flex items-center justify-center gap-1 border border-stone-200 transition active:scale-98"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-stone-600" />
+                        <span className="truncate">{t('uploadSavedPhotoBtn')}</span>
+                      </button>
+                    </div>
                     <input
                       type="url"
                       value={photoUrl}

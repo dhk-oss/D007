@@ -4,6 +4,7 @@ import { X, Check, Camera, Upload, Image as ImageIcon } from 'lucide-react';
 import { ClothingCategory, SeasonType, ChildProfile } from '../types';
 import { DataService } from '../services/dataService';
 import { useTranslation } from '../context/LanguageContext';
+import { getLocalizedChildName } from '../utils/localeHelpers';
 
 interface AddWardrobeItemModalProps {
   isOpen: boolean;
@@ -181,7 +182,7 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
                       alt={child.name}
                       className="w-4 h-4 rounded-full object-cover"
                     />
-                    <span>{child.name.split(' ')[0]}</span>
+                    <span>{getLocalizedChildName(child.name, locale)}</span>
                   </button>
                 );
               })}
@@ -331,7 +332,7 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
               className="w-full py-3 rounded-2xl bg-pastel-coral hover:bg-rose-500 text-white font-extrabold text-xs shadow-soft transition active:scale-98 disabled:opacity-50"
             >
               {(() => {
-                const childFirstName = selectedChild?.name ? selectedChild.name.split(' ')[0] : '';
+                const childFirstName = selectedChild?.name ? getLocalizedChildName(selectedChild.name, locale) : '';
                 if (locale === 'ko') {
                   return `${childFirstName} 옷장에 저장하기`;
                 }

@@ -7,6 +7,7 @@ import {
   getLocalizedCategory,
   getLocalizedColor,
 } from '../utils/wardrobeLocalization';
+import { getLocalizedChildName } from '../utils/localeHelpers';
 
 interface WardrobePickerModalProps {
   isOpen: boolean;
@@ -73,7 +74,7 @@ export const WardrobePickerModal: React.FC<WardrobePickerModalProps> = ({
               {t('manualSwapTitle')}
             </span>
             <h3 className="font-extrabold text-base text-stone-800">
-              {t('swapModalTitle')} ({childName})
+              {t('swapModalTitle')} ({getLocalizedChildName(childName, locale)})
             </h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-full text-stone-400 hover:text-stone-700">

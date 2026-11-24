@@ -9,6 +9,7 @@ import {
   getLocalizedCategory,
   getLocalizedColor,
 } from '../utils/wardrobeLocalization';
+import { getLocalizedChildName } from '../utils/localeHelpers';
 
 export const LookbookPage: React.FC = () => {
   const { lookbooks, activeChild, wardrobe, deleteLookbook } = useApp();
@@ -16,7 +17,7 @@ export const LookbookPage: React.FC = () => {
   const [selectedLook, setSelectedLook] = useState<StylingLookbook | null>(null);
   const [filterByCurrentChild, setFilterByCurrentChild] = useState<boolean>(true);
 
-  const safeChildName = activeChild?.name ? activeChild.name.split(' ')[0] : 'Child';
+  const safeChildName = activeChild?.name ? getLocalizedChildName(activeChild.name, locale) : 'Child';
 
   // Filter lookbooks defensively
   const displayLookbooks = (lookbooks || []).filter((look) => {
