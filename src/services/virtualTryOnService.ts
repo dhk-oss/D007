@@ -150,7 +150,7 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
       const g = data[idx + 1];
       const b = data[idx + 2];
       const a = data[idx + 3];
-      if (a > 200 && r > 205 && g > 205 && b > 205) {
+      if (a > 200 && r > 200 && g > 200 && b > 200) {
         avgBgR += r;
         avgBgG += g;
         avgBgB += b;
@@ -172,10 +172,10 @@ function createGarmentCutout(sourceImg: HTMLImageElement): HTMLCanvasElement {
           (r - avgBgR) ** 2 + (g - avgBgG) ** 2 + (b - avgBgB) ** 2
         );
 
-        if (dist < 32) {
+        if (dist < 34) {
           data[i + 3] = 0;
-        } else if (dist < 56) {
-          const alphaFactor = (dist - 32) / 24;
+        } else if (dist < 60) {
+          const alphaFactor = (dist - 34) / 26;
           data[i + 3] = Math.round(data[i + 3] * alphaFactor);
         }
       }
@@ -204,7 +204,7 @@ async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<stri
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
 
     // 1. Prepare child photo payload
     const childPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
@@ -219,23 +219,23 @@ async function trySynthesizeWithGemini(params: VirtualTryOnParams): Promise<stri
       if (!item.imageUrl) continue;
       const gPayload = await toBase64Payload(item.imageUrl);
       if (gPayload) {
-        garmentParts.push({ text: `Item category: ${item.category}, Name: ${item.name}` });
+        garmentParts.push({ text: `Selected Item [Category: ${item.category}, Name: ${item.name}, Color: ${item.color || 'auto'}]` });
         garmentParts.push({ inlineData: gPayload });
       }
     }
 
-    const promptText = `High-End Kid Fashion Virtual Try-On Synthesis:
-The first attached image is the child model (${params.child.name}, age ${params.child.age}, gender ${params.child.gender}).
-The following images are the selected wardrobe pieces to realistically fit on the child for ${params.occasionLabel} (${params.weather.temp}°C, ${params.weather.condition}):
-${params.items.map((i) => `- ${i.category}: ${i.name} (${i.color || ''})`).join('\n')}
+    const promptText = `High-End Commercial Fashion Virtual Try-On Studio:
+Subject Model: Child ${params.child.name}, age ${params.child.age}, gender ${params.child.gender}.
+Occasion: ${params.occasionLabel} (${params.weather.temp}°C, ${params.weather.condition}).
 
-MANDATORY RULES:
-1. PRESERVE THE CHILD: Keep the child's exact face, facial features, hair, head, expression, body proportions, and posture unchanged.
-2. NATURAL FIT: The child must appear to naturally wear the clothes—not pasted stickers or floating cutouts. Fabrics must fold, drape, sleeve around arms, and cast natural shadows over underlying layers.
-3. CLEAR FACE & EYES: Never cover the child's eyes, forehead, or facial expression with hats or collars.
-4. STUDIO BACKGROUND: Studio clean neutral background. High-resolution commercial catalog photography.`;
+Styling Task:
+Render the child model realistically dressed in the selected wardrobe ensemble.
+Strict requirements:
+1. FACIAL INTEGRITY: Keep the exact face, eyes, hair, head, and joyful expression of the child in the first photo unaltered.
+2. NATURAL WEARING: Seamlessly replace or layer over the original dress. Outerwear wraps around shoulders and arms. Top tucks or drapes naturally. Pants/skirt fall to legs. Shoes match feet grounding.
+3. CLEAR SIGHTLINE: Hats or accessories must sit naturally atop hair without obscuring the child's eyes or forehead.
+4. STUDIO FINISH: Clean studio background, premium catalog quality.`;
 
-    // Attempt Gemini 2.0 / 1.5 multimodal or image generation endpoint
     const requestBody = {
       contents: [
         {
@@ -252,7 +252,7 @@ MANDATORY RULES:
       },
     };
 
-    // First try Imagen/Multimodal image editing if available
+    // Try Gemini image generation / multimodal synthesis
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -267,7 +267,6 @@ MANDATORY RULES:
 
     if (res.ok) {
       const json = await res.json();
-      // Look for candidate inline data or generated image parts
       const candidate = json.candidates?.[0];
       const parts = candidate?.content?.parts;
       if (Array.isArray(parts)) {
@@ -366,13 +365,13 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       }
     }
 
-    // 2. Safe Fallback Compositing:
-    // To avoid pasting awkward floating cutout stickers across the child's face and body:
-    // - Hats/accessories are NEVER placed low over eyes or forehead.
-    // - When displaying user photos, we blend garments with subtle opacity & soft feathered contours,
-    //   or highlight them cleanly in the dedicated interactive fitted rail below without cluttering the face.
-    if (items.length > 0 && !hasCustomPhoto) {
-      // Only overlay on avatar illustration where boundaries are predictable
+    // 2. Realistic Garment Compositing onto Child Photo/Avatar:
+    // Seamlessly fit selected outfit items onto anatomical anchors:
+    // - Hats/accessories sit above hairline, NEVER over eyes or nose.
+    // - Tops/Outerwear cover chest/torso with soft contours.
+    // - Bottoms drape from waist down.
+    // - Shoes ground at feet base.
+    if (items.length > 0) {
       const layerPriority: Record<string, number> = {
         bottoms: 1,
         tops: 2,
@@ -391,10 +390,11 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         const rawImg = await loadImage(item.imageUrl);
         if (rawImg.width === 0 || rawImg.height === 0) continue;
 
+        // Key out solid studio backdrops to get transparent garment shape
         const gCutout = createGarmentCutout(rawImg);
 
         ctx.save();
-        ctx.shadowColor = 'rgba(35, 27, 46, 0.22)';
+        ctx.shadowColor = 'rgba(35, 27, 46, 0.24)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 4;
 
@@ -403,42 +403,44 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
         let gw = 0;
         let gh = 0;
 
-        const torsoY = childBounds.y + childBounds.h * 0.30;
-        const waistY = childBounds.y + childBounds.h * 0.52;
-        const feetY = childBounds.y + childBounds.h * 0.84;
         const aspect = gCutout.height / gCutout.width;
 
+        // Precise anatomical anchors relative to child proportions
+        // Head / Hat anchor: Y = top 0%..12%
+        // Torso / Tops: Y = 28%..54%
+        // Waist / Bottoms: Y = 48%..78%
+        // Feet / Shoes: Y = 84%..96%
         if (item.category === 'accessories') {
-          // Hats placed well above eyebrow line so eyes/face are 100% visible
-          gw = childBounds.w * 0.28;
+          // Hats and hair accessories sit strictly above the eye/brow line
+          gw = childBounds.w * 0.30;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = childBounds.y + childBounds.h * 0.02;
+          gy = childBounds.y + childBounds.h * 0.01;
         } else if (item.category === 'tops') {
-          gw = childBounds.w * 0.48;
+          gw = childBounds.w * 0.50;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = torsoY;
+          gy = childBounds.y + childBounds.h * 0.28;
         } else if (item.category === 'outerwear') {
+          gw = childBounds.w * 0.56;
+          gh = gw * aspect;
+          gx = childBounds.x + (childBounds.w - gw) / 2;
+          gy = childBounds.y + childBounds.h * 0.25;
+        } else if (item.category === 'bottoms') {
+          gw = childBounds.w * 0.44;
+          gh = gw * aspect;
+          gx = childBounds.x + (childBounds.w - gw) / 2;
+          gy = childBounds.y + childBounds.h * 0.48;
+        } else if (item.category === 'onepiece') {
           gw = childBounds.w * 0.52;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = torsoY - 4;
-        } else if (item.category === 'bottoms') {
-          gw = childBounds.w * 0.42;
-          gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = waistY;
-        } else if (item.category === 'onepiece') {
-          gw = childBounds.w * 0.48;
-          gh = gw * aspect;
-          gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = torsoY;
+          gy = childBounds.y + childBounds.h * 0.28;
         } else if (item.category === 'shoes') {
-          gw = childBounds.w * 0.34;
+          gw = childBounds.w * 0.36;
           gh = gw * aspect;
           gx = childBounds.x + (childBounds.w - gw) / 2;
-          gy = feetY;
+          gy = childBounds.y + childBounds.h * 0.84;
         }
 
         if (gw > 0 && gh > 0) {
