@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GarmentCameraModal } from './GarmentCameraModal';
-import { X, Check, Camera, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Check, Camera, Upload, Image as ImageIcon, Sparkles, Loader2 } from 'lucide-react';
 import { ClothingCategory, SeasonType, ChildProfile } from '../types';
 import { DataService } from '../services/dataService';
 import { useTranslation } from '../context/LanguageContext';
 import { getLocalizedChildName } from '../utils/localeHelpers';
+import { analyzeGarmentColorAndMood } from '../services/garmentAnalysisService';
 
 interface AddWardrobeItemModalProps {
   isOpen: boolean;
@@ -58,18 +59,39 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isAnalyzingColor, setIsAnalyzingColor] = useState<boolean>(false);
+  const [autoFilledBadge, setAutoFilledBadge] = useState<boolean>(false);
 
-  // Initialize or update localized default color and child
+  const triggerAutoAnalysis = async (imgUrlOrDataUrl: string) => {
+    if (!imgUrlOrDataUrl || imgUrlOrDataUrl.trim() === '') return;
+    setIsAnalyzingColor(true);
+    try {
+      const result = await analyzeGarmentColorAndMood(imgUrlOrDataUrl, locale);
+      if (result && result.colorMood) {
+        setColor(result.colorMood);
+        setAutoFilledBadge(true);
+      }
+    } catch (err) {
+      console.warn('Garment color analysis error:', err);
+    } finally {
+      setIsAnalyzingColor(false);
+    }
+  };
+
+  // Initialize or update localized default child and reset color if empty
   useEffect(() => {
     if (isOpen) {
-      setColor(t('defaultColorMood'));
       setSelectedChildId(activeChildId);
+      if (!imageUrl) {
+        setColor('');
+        setAutoFilledBadge(false);
+      }
     }
-  }, [isOpen, activeChildId, locale]);
-
+  }, [isOpen, activeChildId]);
 
   const handleCameraCapture = (dataUrl: string) => {
     setImageUrl(dataUrl);
+    triggerAutoAnalysis(dataUrl);
   };
 
 
@@ -116,6 +138,7 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
     try {
       const uploadedUrl = await DataService.uploadImage(file, 'wardrobe');
       setImageUrl(uploadedUrl);
+      await triggerAutoAnalysis(uploadedUrl);
     } catch (err) {
       console.error('File upload failed:', err);
     } finally {
@@ -270,7 +293,13 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
                 <input
                   type="url"
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setImageUrl(val);
+                    if (val.startsWith('http') || val.startsWith('data:image/')) {
+                      triggerAutoAnalysis(val);
+                    }
+                  }}
                   placeholder={t('pasteImageUrlPlaceholder')}
                   className="w-full px-2.5 py-1 text-[11px] rounded-lg border border-stone-200 text-stone-600 truncate focus:outline-none focus:ring-1 focus:ring-pastel-coral/50"
                 />
@@ -280,14 +309,39 @@ export const AddWardrobeItemModal: React.FC<AddWardrobeItemModalProps> = ({
 
           {/* Color & Mood */}
           <div>
-            <label className="block text-xs font-bold text-stone-700 mb-1">{t('colorMood')}</label>
-            <input
-              type="text"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              placeholder={t('colorMoodPlaceholder')}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-pastel-coral/50"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-stone-700">{t('colorMood')}</label>
+              {isAnalyzingColor ? (
+                <span className="text-[11px] font-bold text-pastel-coral flex items-center gap-1 animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {t('analyzingGarmentColor')}
+                </span>
+              ) : autoFilledBadge ? (
+                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-500" />
+                  {t('aiAutoFilledNotice')}
+                </span>
+              ) : null}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={color}
+                onChange={(e) => {
+                  setColor(e.target.value);
+                  setAutoFilledBadge(false);
+                }}
+                placeholder={t('colorMoodPlaceholder')}
+                className={`w-full px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-pastel-coral/50 ${
+                  isAnalyzingColor ? 'bg-pastel-warm/50 border-pastel-coral/40' : 'border-stone-300'
+                }`}
+              />
+              {isAnalyzingColor && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-pastel-coral">
+                  <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Season Rules */}
