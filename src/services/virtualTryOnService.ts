@@ -241,6 +241,145 @@ const GEMINI_IMAGE_MODELS = [
 ];
 
 /**
+ * Invokes an external pluggable Virtual Try-On API or backend proxy route
+ * (e.g., fal.ai / Replicate / OpenAI image editing / custom VTO proxy).
+ * Configured via VITE_EXTERNAL_VTO_ENDPOINT and optional VITE_EXTERNAL_VTO_API_KEY.
+ * Executes sequential multi-item try-on following deterministic fitting order:
+ * Tops/Onepiece -> Bottoms -> Shoes -> Outerwear (open front) -> Accessories.
+ */
+async function trySynthesizeWithExternalVTO(
+  params: VirtualTryOnParams
+): Promise<{ imageUrl: string; providerName: string } | null> {
+  const endpoint =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta.env?.VITE_EXTERNAL_VTO_ENDPOINT ||
+        import.meta.env?.VITE_FAL_VTO_ENDPOINT ||
+        import.meta.env?.VITE_REPLICATE_VTO_ENDPOINT)) ||
+    (typeof window !== 'undefined' &&
+      (window as unknown as { __EXTERNAL_VTO_ENDPOINT__?: string }).__EXTERNAL_VTO_ENDPOINT__);
+
+  const apiKey =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta.env?.VITE_EXTERNAL_VTO_API_KEY ||
+        import.meta.env?.VITE_FAL_KEY ||
+        import.meta.env?.VITE_REPLICATE_API_TOKEN)) ||
+    (typeof window !== 'undefined' &&
+      (window as unknown as { __EXTERNAL_VTO_API_KEY__?: string }).__EXTERNAL_VTO_API_KEY__);
+
+  if (!endpoint) {
+    console.info('[TryOn Diagnostic] External VTO endpoint not configured (VITE_EXTERNAL_VTO_ENDPOINT missing). Trying GCloud VTO / Gemini / Smart Fitting.');
+    return null;
+  }
+
+  if (!params.child.fullBodyPhotoUrl || !params.items.length) {
+    console.info('[TryOn Diagnostic] External VTO skipped: missing child photo or garments.');
+    return null;
+  }
+
+  try {
+    const hasOnepiece = params.items.some((i) => i.category === 'onepiece');
+    const hasInnerTop = params.items.some((i) => i.category === 'tops' || i.category === 'onepiece');
+
+    const layerPriority: Record<string, number> = {
+      tops: hasOnepiece ? 10 : 1,
+      onepiece: 1,
+      bottoms: hasOnepiece ? 10 : 2,
+      shoes: 3,
+      outerwear: 4,
+      accessories: 5,
+    };
+
+    const sortedItems = [...params.items].sort(
+      (a, b) => (layerPriority[a.category] || 99) - (layerPriority[b.category] || 99)
+    );
+
+    const personPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
+    if (!personPayload) {
+      console.warn('[TryOn Diagnostic] External VTO: Failed to serialize child photo to base64.');
+      return null;
+    }
+
+    let currentPersonImage = `data:${personPayload.mimeType};base64,${personPayload.data}`;
+
+    // Sequential fitting across garments
+    for (const item of sortedItems) {
+      if (!item.imageUrl) continue;
+      const garmentPayload = await toBase64Payload(item.imageUrl);
+      if (!garmentPayload) continue;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 9500);
+
+      const isOpenOuterwear = item.category === 'outerwear' && hasInnerTop;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (apiKey) {
+        headers['Authorization'] = apiKey.startsWith('Key ') || apiKey.startsWith('Bearer ') ? apiKey : `Key ${apiKey}`;
+      }
+
+      const requestBody = {
+        model_image: currentPersonImage,
+        garment_image: `data:${garmentPayload.mimeType};base64,${garmentPayload.data}`,
+        category: item.category,
+        garment_description: `${item.name} (${item.color || ''})`,
+        nsfw_filter: true,
+        cover_feet: item.category === 'shoes',
+        adjust_hands: true,
+        restore_face: true,
+        child_profile: {
+          name: params.child.name,
+          age: params.child.age,
+          gender: params.child.gender,
+        },
+        prompt_instruction: `Fit the ${item.category} (${item.name}) naturally on child model ${params.child.name}. Preserve facial identity, hair, posture, and lighting. ${isOpenOuterwear ? 'Outerwear MUST be worn open in front to reveal the inner top underneath.' : ''}`,
+      };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`External VTO returned status ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      // Handle various response schemas: fal.ai ({ image: { url } }), Replicate ({ output: [url] or url }), generic ({ tryOnImageUrl })
+      const candidateUrl =
+        data?.image?.url ||
+        data?.output?.[0] ||
+        (typeof data?.output === 'string' ? data.output : null) ||
+        data?.tryOnImageUrl ||
+        data?.image ||
+        data?.data?.[0]?.url;
+
+      if (candidateUrl) {
+        currentPersonImage = candidateUrl;
+      }
+    }
+
+    if (currentPersonImage !== `data:${personPayload.mimeType};base64,${personPayload.data}`) {
+      console.info('[TryOn Diagnostic] External VTO synthesis succeeded.');
+      return {
+        imageUrl: currentPersonImage,
+        providerName: 'External VTO Engine',
+      };
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('[TryOn Diagnostic] External VTO execution failed/fallback:', err);
+    return null;
+  }
+}
+
+/**
  * Invokes Google Cloud Virtual Try-On API or a proxy server (e.g. Cloud Run, Firebase Cloud Functions).
  * Executes sequential multi-item try-on following deterministic fitting order:
  * Tops/Onepiece -> Bottoms -> Shoes -> Outerwear (open front) -> Accessories.
@@ -483,7 +622,17 @@ Strict rules:
 /** High-fidelity HTML5 Canvas Virtual Try-On Compositor */
 export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
   async renderTryOn(params: VirtualTryOnParams): Promise<VirtualTryOnResult> {
-    // 1. Try Google Cloud Virtual Try-On (Cloud Run / Functions proxy endpoint) first if configured
+    // 1. Try Pluggable External Virtual Try-On provider (fal.ai / Replicate / Custom VTO proxy) first if configured
+    const externalResult = await trySynthesizeWithExternalVTO(params);
+    if (externalResult) {
+      return {
+        imageUrl: externalResult.imageUrl,
+        isAiGenerated: true,
+        providerName: externalResult.providerName,
+      };
+    }
+
+    // 2. Try Google Cloud Virtual Try-On (Cloud Run / Functions proxy endpoint) if configured
     const gcloudResult = await trySynthesizeWithGoogleCloudVTO(params);
     if (gcloudResult) {
       return {
@@ -493,7 +642,7 @@ export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
       };
     }
 
-    // 2. Try Gemini Multimodal AI synthesis if API key is configured
+    // 3. Try Gemini Multimodal AI synthesis if API key is configured
     const geminiResult = await trySynthesizeWithGemini(params);
     if (geminiResult) {
       return {

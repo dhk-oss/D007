@@ -398,7 +398,11 @@ export const HomePage: React.FC = () => {
             >
               <Sparkles className="w-3 h-3 text-[#8B68BD]" />
               {tryOnMode.isAi
-                ? (tryOnMode.provider?.includes('Google Cloud') ? 'GCloud VTO' : 'Gemini AI Vision')
+                ? (tryOnMode.provider?.includes('External')
+                    ? 'External VTO'
+                    : tryOnMode.provider?.includes('Google Cloud')
+                    ? 'GCloud VTO'
+                    : 'Gemini AI Vision')
                 : 'HD Smart Fitting'}
             </span>
             <span className="text-[11px] font-bold text-[#7A56AE] bg-[#F4EFFA] border border-[#EAE2F3] px-2.5 py-0.5 rounded-full">
