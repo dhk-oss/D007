@@ -608,7 +608,7 @@ export const ProfilesPage: React.FC = () => {
                         className="w-full py-2 px-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-bold flex items-center justify-center gap-1 border border-stone-200 transition active:scale-98"
                       >
                         <Upload className="w-3.5 h-3.5 text-stone-600" />
-                        <span className="truncate">{t('uploadSavedPhotoBtn')}</span>
+                        <span className="truncate">{t('uploadSavedPhotoBtn') || '저장된 사진 업로드'}</span>
                       </button>
                     </div>
                     <input

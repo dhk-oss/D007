@@ -257,7 +257,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="e.g. Min-woo (Leo) / Chloe"
+                placeholder={locale === 'ko' ? '예: 하은 / 민우' : 'e.g. Min-woo (Leo) / Chloe'}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-pastel-coral/50"
@@ -370,7 +370,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({
                       className="w-full py-2 px-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-bold flex items-center justify-center gap-1 border border-stone-200 transition active:scale-98"
                     >
                       <Upload className="w-3.5 h-3.5 text-stone-600" />
-                      <span className="truncate">{t('uploadSavedPhotoBtn')}</span>
+                      <span className="truncate">{t('uploadSavedPhotoBtn') || '저장된 사진 업로드'}</span>
                     </button>
                   </div>
                   <input
