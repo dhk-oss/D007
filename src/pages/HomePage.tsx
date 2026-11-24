@@ -394,9 +394,12 @@ export const HomePage: React.FC = () => {
                 color: tryOnMode.isAi ? '#7A56AE' : '#5A4F6B',
                 borderColor: '#EAE2F3',
               }}
+              title={tryOnMode.provider || 'Smart Fitting'}
             >
               <Sparkles className="w-3 h-3 text-[#8B68BD]" />
-              {tryOnMode.isAi ? 'Gemini AI Vision' : 'HD Smart Fitting'}
+              {tryOnMode.isAi
+                ? (tryOnMode.provider?.includes('Google Cloud') ? 'GCloud VTO' : 'Gemini AI Vision')
+                : 'HD Smart Fitting'}
             </span>
             <span className="text-[11px] font-bold text-[#7A56AE] bg-[#F4EFFA] border border-[#EAE2F3] px-2.5 py-0.5 rounded-full">
               {activeItems.length} {t('piecesFitted')}

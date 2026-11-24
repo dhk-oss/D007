@@ -241,6 +241,117 @@ const GEMINI_IMAGE_MODELS = [
 ];
 
 /**
+ * Invokes Google Cloud Virtual Try-On API or a proxy server (e.g. Cloud Run, Firebase Cloud Functions).
+ * Executes sequential multi-item try-on following deterministic fitting order:
+ * Tops/Onepiece -> Bottoms -> Shoes -> Outerwear (open front) -> Accessories.
+ */
+async function trySynthesizeWithGoogleCloudVTO(
+  params: VirtualTryOnParams
+): Promise<{ imageUrl: string; providerName: string } | null> {
+  const endpoint =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta.env?.VITE_GCLOUD_VTO_ENDPOINT ||
+        import.meta.env?.VITE_VTO_API_URL ||
+        import.meta.env?.VITE_FUNCTIONS_VTO_URL)) ||
+    (typeof window !== 'undefined' &&
+      (window as unknown as { __GCLOUD_VTO_ENDPOINT__?: string }).__GCLOUD_VTO_ENDPOINT__);
+
+  if (!endpoint || !params.child.fullBodyPhotoUrl || !params.items.length) {
+    return null;
+  }
+
+  try {
+    const hasOnepiece = params.items.some((i) => i.category === 'onepiece');
+    const hasInnerTop = params.items.some((i) => i.category === 'tops' || i.category === 'onepiece');
+
+    // Deterministic layer priority:
+    // 1. tops / onepiece -> 2. bottoms -> 3. shoes -> 4. outerwear -> 5. accessories
+    const layerPriority: Record<string, number> = {
+      tops: hasOnepiece ? 10 : 1,
+      onepiece: 1,
+      bottoms: hasOnepiece ? 10 : 2,
+      shoes: 3,
+      outerwear: 4,
+      accessories: 5,
+    };
+
+    const sortedItems = [...params.items].sort(
+      (a, b) => (layerPriority[a.category] || 99) - (layerPriority[b.category] || 99)
+    );
+
+    // Prepare initial base person payload
+    const personPayload = await toBase64Payload(params.child.fullBodyPhotoUrl);
+    if (!personPayload) return null;
+
+    let currentPersonImage = `data:${personPayload.mimeType};base64,${personPayload.data}`;
+
+    // Sequential fitting: try-on each garment on top of the running person image
+    for (const item of sortedItems) {
+      if (!item.imageUrl) continue;
+      const garmentPayload = await toBase64Payload(item.imageUrl);
+      if (!garmentPayload) continue;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8500);
+
+      const isOpenOuterwear = item.category === 'outerwear' && hasInnerTop;
+
+      const requestBody = {
+        personImage: currentPersonImage,
+        garmentImage: `data:${garmentPayload.mimeType};base64,${garmentPayload.data}`,
+        category: item.category,
+        itemName: item.name,
+        color: item.color,
+        childMetadata: {
+          name: params.child.name,
+          age: params.child.age,
+          gender: params.child.gender,
+          silhouetteType: params.child.bodyProportionAnalysis?.silhouetteType,
+          upperToLowerRatio: params.child.bodyProportionAnalysis?.upperToLowerRatio,
+        },
+        options: {
+          isOpenFront: isOpenOuterwear,
+          preserveFace: true,
+          preserveHair: true,
+          preserveEyes: true,
+          occasion: params.occasionLabel,
+        },
+      };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Google Cloud VTO returned status ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data?.tryOnImageUrl || data?.outputImage || data?.image) {
+        currentPersonImage = data.tryOnImageUrl || data.outputImage || data.image;
+      }
+    }
+
+    if (currentPersonImage !== `data:${personPayload.mimeType};base64,${personPayload.data}`) {
+      return {
+        imageUrl: currentPersonImage,
+        providerName: 'Google Cloud VTO',
+      };
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Google Cloud VTO execution failed/fallback:', err);
+    return null;
+  }
+}
+
+/**
  * Attempts real AI virtual try-on image synthesis using Gemini Imagen / Multimodal Image generation
  * when an API key is available. Returns the synthesized image URL (base64 data URL) or null.
  */
@@ -345,7 +456,17 @@ Strict rules:
 /** High-fidelity HTML5 Canvas Virtual Try-On Compositor */
 export class CanvasVirtualTryOnRenderer implements VirtualTryOnProvider {
   async renderTryOn(params: VirtualTryOnParams): Promise<VirtualTryOnResult> {
-    // 1. Try Gemini AI synthesis if available
+    // 1. Try Google Cloud Virtual Try-On (Cloud Run / Functions proxy endpoint) first if configured
+    const gcloudResult = await trySynthesizeWithGoogleCloudVTO(params);
+    if (gcloudResult) {
+      return {
+        imageUrl: gcloudResult.imageUrl,
+        isAiGenerated: true,
+        providerName: gcloudResult.providerName,
+      };
+    }
+
+    // 2. Try Gemini Multimodal AI synthesis if API key is configured
     const geminiResult = await trySynthesizeWithGemini(params);
     if (geminiResult) {
       return {
